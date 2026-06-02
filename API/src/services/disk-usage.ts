@@ -1,7 +1,10 @@
-const fs = require('fs')
-const path = require('path')
-const s = require('../hooks/security')
-const { logger } = require('../modules')
+import * as fs from 'fs'
+import * as path from 'path'
+
+import s from '../hooks/security'
+import { logger } from '../modules'
+import { PATCH_DIR_NAME } from '../modules/expo/patch'
+import type { AppLike, UnknownRecord } from '../types'
 
 const CACHE_TTL_MS = 10 * 1000
 const UPDATES_ROOT = process.env.UPDATES_ROOT || '/updates'
@@ -27,14 +30,47 @@ const dirSize = (dir) => {
       try {
         if (entry.isDirectory()) stack.push(full)
         else if (entry.isFile()) total += fs.statSync(full).size
-      } catch (e) { /* ignore transient FS errors */ }
+      } catch (e) {
+        /* ignore transient FS errors */
+      }
     }
   }
   return total
 }
 
 const computeSizes = () => {
-  const updatesBytes = fs.existsSync(UPDATES_ROOT) ? dirSize(UPDATES_ROOT) : 0
+  // Walk UPDATES_ROOT splitting bytes between "regular" update bundles and
+  // anything living inside a PATCH_DIR_NAME subfolder (bsdiff patch files).
+  // Each upload has its own optional ._patches/ inside its extracted dir.
+  let updatesBytes = 0
+  let patchesBytes = 0
+
+  const walk = (dir, depth = 0) => {
+    let entries
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true })
+    } catch (e) {
+      return
+    }
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name)
+      if (entry.isDirectory()) {
+        if (entry.name === PATCH_DIR_NAME) {
+          patchesBytes += dirSize(full)
+        } else {
+          walk(full, depth + 1)
+        }
+      } else if (entry.isFile()) {
+        try {
+          updatesBytes += fs.statSync(full).size
+        } catch (e) {
+          /* ignore */
+        }
+      }
+    }
+  }
+
+  if (fs.existsSync(UPDATES_ROOT)) walk(UPDATES_ROOT)
 
   let totalBytes = 0
   let freeBytes = 0
@@ -51,7 +87,7 @@ const computeSizes = () => {
         bfree: stat.bfree,
         bavail: stat.bavail,
         totalBytes,
-        freeBytes
+        freeBytes,
       })
     }
   } catch (e) {
@@ -61,33 +97,40 @@ const computeSizes = () => {
 
   return {
     updatesBytes,
+    patchesBytes,
     totalBytes,
     freeBytes,
     usedBytes,
-    computedAt: new Date()
+    computedAt: new Date(),
   }
 }
 
 class Service {
-  options: any
-  app: any
-  constructor (options) { this.options = options || {} }
-  setup (app) { this.app = app }
+  options: UnknownRecord
+  app: AppLike
+  constructor(options?: UnknownRecord) {
+    this.options = options || {}
+  }
+  setup(app: AppLike) {
+    this.app = app
+  }
 
-  async find () { return this.get() }
+  async find() {
+    return this.get()
+  }
 
-  async get () {
+  async get() {
     const now = Date.now()
-    if (cache && (now - cacheAt) < CACHE_TTL_MS) return cache
+    if (cache && now - cacheAt < CACHE_TTL_MS) return cache
     cache = computeSizes()
     cacheAt = now
     return cache
   }
 }
 
-module.exports = {
+export default {
   name: 'disk-usage',
-  createService: (options) => new Service(options),
+  createService: (options?: UnknownRecord) => new Service(options),
   hooks: {
     before: {
       all: s.defaultSecurity(),
@@ -96,10 +139,16 @@ module.exports = {
       create: [s.methodNotAllowed],
       update: [s.methodNotAllowed],
       patch: [s.methodNotAllowed],
-      remove: [s.methodNotAllowed]
+      remove: [s.methodNotAllowed],
     },
     after: {
-      all: [], find: [], get: [], create: [], update: [], patch: [], remove: []
-    }
-  }
+      all: [],
+      find: [],
+      get: [],
+      create: [],
+      update: [],
+      patch: [],
+      remove: [],
+    },
+  },
 }

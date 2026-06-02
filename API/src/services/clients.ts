@@ -1,6 +1,6 @@
-const s = require('../hooks/security')
+import s from '../hooks/security'
 
-module.exports = {
+export default {
   name: 'clients',
   noBsonIDs: true,
   hooks: {
@@ -11,7 +11,7 @@ module.exports = {
       create: [],
       update: [],
       patch: [],
-      remove: []
+      remove: [],
     },
 
     after: {
@@ -21,7 +21,7 @@ module.exports = {
       create: [],
       update: [],
       patch: [],
-      remove: []
-    }
-  }
+      remove: [],
+    },
+  },
 }

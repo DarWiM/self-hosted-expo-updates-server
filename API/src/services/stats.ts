@@ -1,42 +1,87 @@
-const s = require('../hooks/security')
-const moment = require('moment')
+import moment from 'moment'
+
+import s from '../hooks/security'
+import type { AppLike, ClientRecord, UnknownRecord } from '../types'
+
+interface UpdateStats {
+  onThisVersion: number
+  lastSeen?: string | Date
+}
+
+interface StatsBucket {
+  version?: string
+  platform?: string
+  releaseChannel?: string
+  embeddedUpdates: Set<string>
+  updates: Record<string, UpdateStats>
+}
+
 class Service {
-  constructor (options) {
+  options: UnknownRecord
+  app: AppLike
+
+  constructor(options?: UnknownRecord) {
     this.options = options || {}
   }
 
-  setup (app) {
+  setup(app: AppLike) {
     this.app = app
   }
 
-  async get (project) {
-    const clients = await this.app.service('clients').find({ query: { project } })
-    const stats = {}
+  async get(project: string) {
+    const clients = (await this.app.service('clients').find({ query: { project } })) as ClientRecord[]
+    const stats: Record<string, StatsBucket> = {}
 
-    clients.forEach(({ version, platform, embeddedUpdate, currentUpdate, updateCount, releaseChannel, lastSeen }) => {
+    // First pass — accumulate per-(version,platform,channel) totals and
+    // collect *all* embedded update IDs seen (one runtime can have multiple
+    // native builds, each with its own embedded bundle).
+    clients.forEach(({ version, platform, embeddedUpdate, currentUpdate, releaseChannel, lastSeen }) => {
       const key = `${version}-${platform}-${releaseChannel}`
-      if (!stats[key]) stats[key] = { version, platform, releaseChannel, embeddedUpdate, updates: {} }
-      if (!stats[key].updates[currentUpdate]) stats[key].updates[currentUpdate] = { onThisVersion: 0, updateRequests: 0, lastSeen, isBuild: currentUpdate === embeddedUpdate }
+      if (!stats[key]) {
+        stats[key] = {
+          version,
+          platform,
+          releaseChannel,
+          embeddedUpdates: new Set(),
+          updates: {},
+        }
+      }
+      if (embeddedUpdate) stats[key].embeddedUpdates.add(embeddedUpdate)
+      if (!currentUpdate) return
+      if (!stats[key].updates[currentUpdate]) {
+        stats[key].updates[currentUpdate] = { onThisVersion: 0, lastSeen }
+      }
       stats[key].updates[currentUpdate].onThisVersion++
-      stats[key].updates[currentUpdate].updateRequests += (updateCount || 0)
-      if (moment(lastSeen).isAfter(stats[key].updates[currentUpdate].lastSeen)) stats[key].updates[currentUpdate].lastSeen = lastSeen
+      if (moment(lastSeen).isAfter(stats[key].updates[currentUpdate].lastSeen)) {
+        stats[key].updates[currentUpdate].lastSeen = lastSeen
+      }
     })
 
-    const result = Object.values(stats).map(({ updates, ...rest }) => ({
-      ...rest,
-      updates: Object.entries(updates).map(([updateId, fields]) => ({
-        updateId,
-        ...fields
-      }))
-    })).sort((a, b) => a.version > b.version)
+    // Second pass — flatten and mark which updates correspond to embedded
+    // builds (an update is "embedded" if it appears in the group's
+    // embeddedUpdates set).
+    const result = Object.values(stats)
+      .map(({ updates, embeddedUpdates, ...rest }) => {
+        const embeddedList = [...embeddedUpdates]
+        return {
+          ...rest,
+          embeddedUpdates: embeddedList,
+          updates: Object.entries(updates).map(([updateId, fields]) => ({
+            updateId,
+            ...fields,
+            isBuild: embeddedUpdates.has(updateId),
+          })),
+        }
+      })
+      .sort((a, b) => (a.version > b.version ? -1 : a.version < b.version ? 1 : 0))
 
     return result
   }
 }
 
-module.exports = {
+export default {
   name: 'stats',
-  createService: (params) => new Service(params),
+  createService: (params?: UnknownRecord) => new Service(params),
   hooks: {
     before: {
       all: s.defaultSecurity(),
@@ -45,7 +90,7 @@ module.exports = {
       create: [],
       update: [],
       patch: [],
-      remove: []
+      remove: [],
     },
     after: {
       all: [],
@@ -54,7 +99,7 @@ module.exports = {
       create: [],
       update: [],
       patch: [],
-      remove: []
-    }
-  }
+      remove: [],
+    },
+  },
 }

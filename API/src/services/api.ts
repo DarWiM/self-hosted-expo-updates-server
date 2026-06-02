@@ -1,27 +1,36 @@
-const s = require('../hooks/security')
-const Err = require('@feathersjs/errors')
-const { hanldeManifestData, handleManifestResponse } = require('../modules/expo/manifest')
-const { handleAssetData, handleAssetResponse } = require('../modules/expo/asset')
-const { getRequestParams } = require('../modules/expo/request')
+import * as Err from '@feathersjs/errors'
+
+import s from '../hooks/security'
+import { handleAssetData, handleAssetResponse } from '../modules/expo/asset'
+import { handleManifestResponse, hanldeManifestData } from '../modules/expo/manifest'
+import { getRequestParams } from '../modules/expo/request'
+import type { AppLike, ClientRecord, UnknownRecord } from '../types'
 
 class Service {
-  constructor (options) {
+  options: UnknownRecord
+  app: AppLike
+  throttleTime: number
+  throttleController: Record<string, { lastCall?: number; debounce?: ReturnType<typeof setTimeout> }>
+
+  constructor(options?: UnknownRecord) {
     this.options = options || {}
   }
 
-  setup (app) {
+  setup(app: AppLike) {
     this.app = app
-    this.throttleTime = app.get('statsThrottle') || 5000
+    const throttleTime = app.get('statsThrottle')
+    this.throttleTime = typeof throttleTime === 'number' ? throttleTime : Number(throttleTime) || 5000
     this.throttleController = {}
   }
 
-  sendReactQueryUpdate (project) {
+  sendReactQueryUpdate(project: string) {
     this.throttleController[project].lastCall = Date.now()
     this.app.service('messages').create({ action: 'update', keys: [['stats', project]] })
   }
 
-  updateClientsReactQuery (project) {
-    if (!this.throttleController[project]) { // Never called an update before, calling now
+  updateClientsReactQuery(project: string) {
+    if (!this.throttleController[project]) {
+      // Never called an update before, calling now
       this.throttleController[project] = {}
       this.sendReactQueryUpdate(project)
       return true
@@ -29,7 +38,8 @@ class Service {
 
     const timeSinceLastCall = Date.now() - this.throttleController[project].lastCall
 
-    if (timeSinceLastCall > this.throttleTime) { // Enough time passed, calling now
+    if (timeSinceLastCall > this.throttleTime) {
+      // Enough time passed, calling now
       this.sendReactQueryUpdate(project)
     } else {
       // Not Enough time passed, debouncing
@@ -40,26 +50,24 @@ class Service {
     }
   }
 
-  async clientMetrics (id, { query, headers }) {
-    const {
-      project,
-      platform,
-      runtimeVersion,
-      releaseChannel
-    } = getRequestParams({ query, headers })
+  async clientMetrics(
+    id: unknown,
+    { query, headers }: { query: UnknownRecord; headers: Record<string, string | undefined> },
+  ) {
+    const { project, platform, runtimeVersion, releaseChannel } = getRequestParams({ query, headers })
 
     const _id = headers['eas-client-id']
     const embeddedUpdate = headers['expo-embedded-update-id']
     const currentUpdate = headers['expo-current-update-id']
     if (!_id) return false
-    const [client] = await this.app.service('clients').find({ query: { _id } })
+    const [client] = (await this.app.service('clients').find({ query: { _id } })) as ClientRecord[]
     if (client) {
       await this.app.service('clients').patch(client._id, {
         lastSeen: new Date().toISOString(),
         version: runtimeVersion,
         embeddedUpdate,
         currentUpdate,
-        updateCount: 1 + (client.updateCount || 0)
+        updateCount: 1 + (client.updateCount || 0),
       })
     } else {
       await this.app.service('clients').create({
@@ -72,33 +80,37 @@ class Service {
         releaseChannel,
         embeddedUpdate,
         currentUpdate,
-        updateCount: 1
+        updateCount: 1,
       })
     }
     this.updateClientsReactQuery(project)
   }
 
-  async get (id, { query, headers }) {
+  async get(id: string, { query, headers }: { query: UnknownRecord; headers: Record<string, string | undefined> }) {
     if (id === 'manifest') {
       this.clientMetrics(id, { query, headers })
       return hanldeManifestData(this.app, { query, headers })
     }
 
-    if (id === 'assets') return handleAssetData({ query })
+    if (id === 'assets') return handleAssetData(this.app, { query, headers })
     throw new Err.BadRequest('Invalid request.')
   }
 }
 
 const apiService = new Service()
 
-module.exports = {
+export default {
   name: 'api',
-  createService: (options) => apiService,
-  middleware: (req, res, next) => {
-    const protocolVersion = req.headers["expo-protocol-version"];
+  createService: (options?: UnknownRecord) => apiService,
+  middleware: (
+    req: { headers: Record<string, string | undefined> },
+    res: { data: { type: string } },
+    next: () => void,
+  ) => {
+    const protocolVersion = req.headers['expo-protocol-version']
 
     if (res.data.type === 'manifest') return handleManifestResponse(res, protocolVersion)
-    if (res.data.type === 'asset') return handleAssetResponse(res)
+    if (res.data.type === 'asset' || res.data.type === 'patch') return handleAssetResponse(res)
     next()
   },
   hooks: {
@@ -109,7 +121,7 @@ module.exports = {
       create: [s.methodNotAllowed],
       update: [s.methodNotAllowed],
       patch: [s.methodNotAllowed],
-      remove: [s.methodNotAllowed]
+      remove: [s.methodNotAllowed],
     },
     after: {
       all: [],
@@ -118,9 +130,9 @@ module.exports = {
       create: [],
       update: [],
       patch: [],
-      remove: []
-    }
-  }
+      remove: [],
+    },
+  },
 }
 
-module.exports.Service = Service
+export { Service }

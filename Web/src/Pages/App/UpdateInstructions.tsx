@@ -1,7 +1,20 @@
-import { Button, Text, Input } from '../../Components'
+import { Button, Input, Text } from '../../Components'
 import { FC, useCQuery } from '../../Services'
+import type { AppRecord } from '../../types'
 
-const getSnippet = ({ server, slug, uploadKey }) => `# Expo publish to local folder
+interface UploadKeyRecord {
+  uploadKey?: string
+}
+
+const getSnippet = ({
+  server,
+  slug,
+  uploadKey,
+}: {
+  server: string
+  slug: string
+  uploadKey: string
+}) => `# Expo publish to local folder
 cd /my/app/folder
 yarn expo export --output-dir /path/to/build/folder
 
@@ -33,16 +46,22 @@ const handleDownload = () => {
   document.body.removeChild(link)
 }
 
-export const UpdateInstructions = ({ app }) => {
-  const { data = {} } = useCQuery('uploadKey')
+export const UpdateInstructions = ({ app }: { app: AppRecord }) => {
+  const { data = {} } = useCQuery<UploadKeyRecord>('uploadKey')
   const snippet = getSnippet({ server: FC.server, slug: app._id, uploadKey: data?.uploadKey || '?' })
   console.log(app)
   return (
     <>
-      <Text value='There are no updates found.' />
-      <Button icon='download' label='Download publish script' onClick={handleDownload} style={{ marginTop: 20, marginBottom: 20, width: 350 }}>Create</Button>
+      <Text value="There are no updates found." />
+      <Button
+        icon="download"
+        label="Download publish script"
+        onClick={handleDownload}
+        style={{ marginTop: 20, marginBottom: 20, width: 350 }}>
+        Create
+      </Button>
 
-      <Text value='Or Build your own script using this snippet:' />
+      <Text value="Or Build your own script using this snippet:" />
       <Input multiline rows={10} useState={[snippet, () => null]} style={{ marginTop: 10, width: '100%' }} />
     </>
   )

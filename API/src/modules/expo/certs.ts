@@ -1,5 +1,7 @@
-const { md, pki, random, util } = require('node-forge')
-const nullthrows = require('nullthrows')
+import { md, pki, random, util } from 'node-forge'
+import nullthrowsModule from 'nullthrows'
+
+const nullthrows: <T>(value: T | null | undefined) => T = nullthrowsModule
 
 // a hexString is considered negative if its most significant bit is 1
 // because serial numbers use ones' complement notation
@@ -23,7 +25,7 @@ const generateSelfSignedCodeSigningCertificate = ({
   keyPair: { publicKey, privateKey },
   validityNotBefore,
   validityNotAfter,
-  commonName
+  commonName,
 }) => {
   const cert = pki.createCertificate()
   cert.publicKey = publicKey
@@ -35,8 +37,8 @@ const generateSelfSignedCodeSigningCertificate = ({
   const attrs = [
     {
       name: 'commonName',
-      value: commonName
-    }
+      value: commonName,
+    },
   ]
   cert.setSubject(attrs)
   cert.setIssuer(attrs)
@@ -49,7 +51,7 @@ const generateSelfSignedCodeSigningCertificate = ({
       digitalSignature: true,
       nonRepudiation: false,
       keyEncipherment: false,
-      dataEncipherment: false
+      dataEncipherment: false,
     },
     {
       name: 'extKeyUsage',
@@ -58,15 +60,15 @@ const generateSelfSignedCodeSigningCertificate = ({
       clientAuth: false,
       codeSigning: true,
       emailProtection: false,
-      timeStamping: false
-    }
+      timeStamping: false,
+    },
   ])
 
   cert.sign(privateKey, md.sha256.create())
   return cert
 }
 
-module.exports.generateSelfSigned = async () => {
+export const generateSelfSigned = async () => {
   const keyPair = pki.rsa.generateKeyPair()
   const validityNotBefore = new Date()
   const validityNotAfter = new Date()
@@ -75,13 +77,13 @@ module.exports.generateSelfSigned = async () => {
     keyPair,
     validityNotBefore,
     validityNotAfter,
-    commonName: 'test'
+    commonName: 'test',
   })
 
   const result = {
     // publicKey: pki.privateKeyToPem(keyPair.privateKey),
     privateKey: pki.privateKeyToPem(keyPair.privateKey),
-    certificate: pki.certificateToPem(certificate)
+    certificate: pki.certificateToPem(certificate),
   }
   return result
 }

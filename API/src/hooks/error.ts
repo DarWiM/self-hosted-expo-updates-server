@@ -1,9 +1,9 @@
-module.exports = {
+export default {
   all: [],
   find: [],
   get: [],
   create: [],
   update: [],
   patch: [],
-  remove: []
+  remove: [],
 }
