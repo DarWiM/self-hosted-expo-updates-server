@@ -71,7 +71,7 @@ If you have Docker installed you clone this project you and play around by runni
 ## Deploy on your server
 
 If you use Docker you can find a production-ready docker-compose files under the Docker folder, just copy Docker/production on your server, set your secrets / credentials and you are ready to go. The two docker images are public and ready to go.
-Explanation for the Environment settings is in the docker-compose file. For production reverse proxy with Apache take a look at **README DOCKER.md**
+Explanation for the Environment settings is in the docker-compose file. For production reverse proxy setup (Apache and Nginx examples) take a look at [Deployment & Reverse Proxy](docs/deployment.md).
 
 Otherwise you can build from code: the API server lives under the `API` folder and the dashboard under the `Web` folder.
 
@@ -223,7 +223,6 @@ How it works:
 
 > 📷 **Screenshot:** _Worker settings tab — live-configurable tick / cooldown / concurrency / benefit ratio_
 > ![Worker settings](https://github.com/user-attachments/assets/bce7349e-2793-47b9-b67e-db97ff870ac6)
-
 
 ## Pre-release integrity checks
 
