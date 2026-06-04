@@ -26,7 +26,7 @@ Two independent switches must both be on.
 
 **1. Server, per app** — the `bsdiffEnabled` flag on the app (toggled from the dashboard). Controls whether the server generates and serves patches for that app; use it as a canary rollout knob. Turning it off stops new generation immediately.
 
-**2. Client, per build** — the Expo config property `updates.enableBsdiffPatchSupport`, which **defaults to `true`** on SDK 55+. A standard build already requests patches; you only need to set it if it was previously disabled:
+**2. Client, per build** — the Expo config property `updates.enableBsdiffPatchSupport`. It **defaults to `true` on SDK 56+** (a standard build already requests patches — only act if it was disabled), but **defaults to `false` on SDK 55**, where it must be enabled explicitly:
 
 ```json
 { "expo": { "updates": { "enableBsdiffPatchSupport": true } } }

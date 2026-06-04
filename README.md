@@ -183,7 +183,7 @@ How it works:
 ### Enabling it
 
 1. **Server side:** turn on the `bsdiff` toggle for the app in the Web UI. This controls whether the server generates and serves patches for that app.
-2. **Client side:** on SDK 55+ bsdiff patch support is **on by default** — the [`expo-updates`](https://docs.expo.dev/versions/latest/sdk/updates/) config property `updates.enableBsdiffPatchSupport` defaults to `true`, so a standard build already accepts patches. You only need to touch it if it was previously disabled:
+2. **Client side:** the [`expo-updates`](https://docs.expo.dev/versions/latest/sdk/updates/) config property `updates.enableBsdiffPatchSupport` controls this. It **defaults to `true` on SDK 56+** (a standard build already accepts patches — only act if it was disabled), but **defaults to `false` on SDK 55**, where you must enable it explicitly:
 
    ```json
    {
