@@ -81,6 +81,11 @@ const queries: Record<string, AppQuery> = {
     queryFn: (key, app) => FC.service('stats').get(app),
     noInitalPrefetch: true,
   },
+  adoption: {
+    config: queryConfig.rare,
+    queryFn: (key, app) => FC.service('adoption').get(app),
+    noInitalPrefetch: true,
+  },
   diskUsage: {
     config: { staleTime: 15 * time.seconds, gcTime: 60 * time.seconds, refetchInterval: 30 * time.seconds },
     queryFn: () => FC.service('disk-usage').find(),
