@@ -41,12 +41,41 @@ export const getPrivateKeyAsync = async () => {
   }
 }
 
+// Asset files are immutable within an upload, but the manifest endpoint is hit
+// by every client on every launch — recomputing sha256+md5 over every asset
+// (including the multi-MB launch bundle) on each request blocks the event loop.
+// Cache the file-derived hashes keyed by path + size + mtime; the stat guard is
+// microseconds vs. reading and hashing megabytes, and invalidates if a path is
+// ever reused with different bytes. LRU-capped so memory can't grow unbounded.
+const HASH_CACHE_MAX = Number(process.env.ASSET_HASH_CACHE_MAX) || 5000
+const hashCache = new Map<string, { hash: string; key: string }>()
+
+const getAssetHashesCached = (resolvedPath: string): { hash: string; key: string } => {
+  const stat = fs.statSync(resolvedPath)
+  const cacheKey = `${resolvedPath}:${stat.size}:${stat.mtimeMs}`
+  const hit = hashCache.get(cacheKey)
+  if (hit) {
+    // Refresh recency: re-insert moves the entry to the end of the Map.
+    hashCache.delete(cacheKey)
+    hashCache.set(cacheKey, hit)
+    return hit
+  }
+  const asset = fs.readFileSync(resolvedPath, null)
+  const value = {
+    hash: getBase64URLEncoding(createHash(asset, 'sha256', 'base64')),
+    key: createHash(asset, 'md5', 'hex'),
+  }
+  hashCache.set(cacheKey, value)
+  if (hashCache.size > HASH_CACHE_MAX) {
+    hashCache.delete(hashCache.keys().next().value) // evict least-recently used
+  }
+  return value
+}
+
 export const getAssetMetadataSync = ({ update, filePath, ext, isLaunchAsset, platform }: AssetMetadataOptions) => {
   const normalizedFilePath = path.normalize(filePath).replace(/\\/g, '/')
   const assetFilePath = path.join(update.path, normalizedFilePath)
-  const asset = fs.readFileSync(path.resolve(assetFilePath), null)
-  const assetHash = getBase64URLEncoding(createHash(asset, 'sha256', 'base64'))
-  const key = createHash(asset, 'md5', 'hex')
+  const { hash: assetHash, key } = getAssetHashesCached(path.resolve(assetFilePath))
   const keyExtensionSuffix = isLaunchAsset ? 'bundle' : ext
   const contentType = isLaunchAsset ? 'application/javascript' : mime.getType(ext)
 
