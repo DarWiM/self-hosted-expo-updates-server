@@ -282,19 +282,60 @@ export const handleAssetData = async (app, { query, headers }) => {
   }
 }
 
-export const handleAssetResponse = (res) => {
-  if (res.data.type === 'patch') {
-    const patchBuf = fs.readFileSync(res.data.path, null)
-    res.status(226)
-    res.set('IM', 'bsdiff')
-    res.set('expo-base-update-id', res.data.baseUpdateId)
-    res.type('application/octet-stream')
-    res.end(patchBuf)
+// Stream a file from disk instead of buffering it whole with readFileSync.
+// readFileSync blocks the single-threaded event loop for the entire read —
+// under concurrent clients pulling multi-MB bundles/patches that serialises
+// every request. createReadStream + pipe is async with backpressure, so the
+// loop stays free and memory stays bounded.
+const streamAssetFile = (
+  res,
+  filePath: string,
+  { status, contentType, headers }: { status?: number; contentType: string; headers?: Record<string, string> },
+) => {
+  // Phase A — before any byte is written we can still send a clean status.
+  let size: number
+  try {
+    size = fs.statSync(filePath).size
+  } catch (e) {
+    logger.error('asset.stream: stat failed before send', { path: filePath, error: e.message })
+    if (!res.headersSent) res.status(404).end()
     return
   }
-  const asset = fs.readFileSync(res.data.path, null)
-  res.type(res.data.contentType)
-  res.end(asset)
+
+  if (status) res.status(status)
+  if (headers) {
+    for (const [key, value] of Object.entries(headers)) res.set(key, value)
+  }
+  res.type(contentType)
+  res.set('Content-Length', String(size))
+
+  const stream = fs.createReadStream(filePath)
+  // Phase B — headers may already be flushed, so the status is locked in.
+  // The only honest signal left is to destroy the connection; the Expo client
+  // detects the truncated/aborted download (size/hash mismatch) and retries.
+  stream.on('error', (e) => {
+    logger.error('asset.stream: read error mid-stream', { path: filePath, error: e.message })
+    if (!res.headersSent) {
+      res.status(404).end()
+    } else {
+      res.destroy()
+    }
+  })
+  // Client aborted the download — close the fd so it isn't leaked under load.
+  res.on('close', () => stream.destroy())
+  stream.pipe(res)
+}
+
+export const handleAssetResponse = (res) => {
+  if (res.data.type === 'patch') {
+    streamAssetFile(res, res.data.path, {
+      status: 226,
+      contentType: 'application/octet-stream',
+      headers: { IM: 'bsdiff', 'expo-base-update-id': res.data.baseUpdateId },
+    })
+    return
+  }
+  streamAssetFile(res, res.data.path, { contentType: res.data.contentType })
 }
 
 export const getJSONInfo = ({ path: paramPath }) => {
