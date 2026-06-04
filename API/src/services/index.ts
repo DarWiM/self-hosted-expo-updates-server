@@ -3,6 +3,7 @@ import type { Db } from 'mongodb'
 
 import error from '../hooks/error'
 import type { AppLike, UnknownRecord } from '../types'
+import adoption from './adoption'
 import api from './api'
 import apps from './apps'
 import authentication from './authentication'
@@ -40,6 +41,7 @@ const defaultMiddleware = (req: unknown, res: unknown, next: () => void) => {
 }
 
 const services: ServiceModule[] = [
+  adoption,
   api,
   apps,
   authentication,

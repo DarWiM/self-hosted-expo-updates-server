@@ -12,7 +12,7 @@ const broadcastUploadChange = (context: HookContextLike) => {
     if (typeof row?.project === 'string') projects.add(row.project)
   }
   const keys: Array<string | string[]> = ['uploads', 'published']
-  for (const project of projects) keys.push(['stats', project])
+  for (const project of projects) keys.push(['stats', project], ['adoption', project])
   context.app.service('messages').create({ action: 'update', keys })
   return context
 }

@@ -9,6 +9,7 @@ import { useCollapsedState, useCQuery } from '../../Services'
 import type { AppRecord, ListResult, UploadRecord } from '../../types'
 import { listFromResult } from '../../types'
 import { Release } from '../App/Release'
+import { AdoptionPanel } from './AdoptionPanel'
 
 interface StatsUpdate {
   updateId: string
@@ -447,6 +448,8 @@ export const AppDisplay = ({ app, goto }: { app: AppRecord; goto: () => void }) 
       {isSuccess && runtimeList.length === 0 && (
         <Text value="No clients have made requests for updates on this server yet." style={{ marginBottom: 20 }} />
       )}
+      {isSuccess && runtimeList.length > 0 && <AdoptionPanel project={app._id} />}
+
       {isSuccess &&
         runtimeList.map(({ version, channelGroups }) => (
           <RuntimeSectionContainer
