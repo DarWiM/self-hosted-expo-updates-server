@@ -6,7 +6,7 @@ import { getBsdiffSettings } from '../../services/bsdiff-settings'
 import type { LoggerLike } from '../../types'
 import loggerDefault from '../logger'
 import { isLaunchBundleHealthy } from './integrity'
-import { getLaunchAssetPath } from './patch'
+import { getLaunchAssetPathAsync } from './patch'
 const logger: LoggerLike = loggerDefault
 
 const PATCH_TERMINAL_NOT_BENEFICIAL = 'not-beneficial'
@@ -75,9 +75,9 @@ const decidePatchAction = (existing, now) => {
   return { decision: 'fallback' }
 }
 
-const isLaunchAssetPath = (assetPath, upload, platform) => {
+const isLaunchAssetPath = async (assetPath, upload, platform) => {
   try {
-    const expected = path.resolve(getLaunchAssetPath(upload, platform))
+    const expected = path.resolve(await getLaunchAssetPathAsync(upload, platform))
     return path.resolve(assetPath) === expected
   } catch (e) {
     return false
@@ -126,7 +126,7 @@ const tryHandlePatch = async (app, { query, headers }, fallback) => {
   if (toUpload.releaseChannel !== fromUpload.releaseChannel) return fallback
 
   // Verify the requested asset is actually the launch bundle of toUpload
-  if (!isLaunchAssetPath(asset, toUpload, platform)) return fallback
+  if (!(await isLaunchAssetPath(asset, toUpload, platform))) return fallback
 
   // Integrity gate — never serve or queue patches based on broken bundles.
   // We check both ends because:
@@ -135,7 +135,7 @@ const tryHandlePatch = async (app, { query, headers }, fallback) => {
   //     a syntactically valid but semantically wrong patch.
   //   - if the TO bundle is broken, the patch would reconstruct corrupt
   //     output, which the client would reject (or worse, accept).
-  const fromHealth = isLaunchBundleHealthy(fromUpload, platform)
+  const fromHealth = await isLaunchBundleHealthy(fromUpload, platform)
   if (!fromHealth.healthy) {
     logger.warn('asset.patch: skipping — FROM bundle has integrity errors', {
       fromUpdateId: currentUpdateId,
@@ -143,7 +143,7 @@ const tryHandlePatch = async (app, { query, headers }, fallback) => {
     })
     return fallback
   }
-  const toHealth = isLaunchBundleHealthy(toUpload, platform)
+  const toHealth = await isLaunchBundleHealthy(toUpload, platform)
   if (!toHealth.healthy) {
     logger.warn('asset.patch: skipping — TO bundle has integrity errors', {
       toUpdateId: requestedUpdateId,

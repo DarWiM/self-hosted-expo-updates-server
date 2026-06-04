@@ -124,6 +124,24 @@ export const getMetadataSync = (update: UploadRecord): MetadataResult => {
   }
 }
 
+// Async sibling of getMetadataSync. Used by the integrity / admin-walk paths
+// that run on the main event loop, so the metadata.json read happens on the
+// libuv threadpool instead of blocking. getMetadataSync stays for the manifest
+// hot path and the patch worker thread.
+export const getMetadataAsync = async (update: UploadRecord): Promise<MetadataResult> => {
+  try {
+    const metadataPath = path.resolve(`${update.path}/metadata.json`)
+    const updateMetadataBuffer = await fs.promises.readFile(metadataPath)
+    const metadataJson = JSON.parse(updateMetadataBuffer.toString('utf-8'))
+    return {
+      metadataJson,
+      createdAt: resolveManifestTimestamp(update),
+    }
+  } catch (error) {
+    throw new Error(`No update found with runtime version: ${update.version}. Error: ${error}`)
+  }
+}
+
 const convertSHA256HashToUUID = (value) => {
   return `${value.slice(0, 8)}-${value.slice(8, 12)}-${value.slice(12, 16)}-${value.slice(16, 20)}-${value.slice(20, 32)}`
 }
@@ -137,6 +155,14 @@ const getUpdateHash = (pathToUpdate) => {
 }
 
 export { getUpdateHash }
+
+const getUpdateHashAsync = async (pathToUpdate) => {
+  const metadataPath = path.resolve(`${pathToUpdate}/metadata.json`)
+  const updateMetadataBuffer = await fs.promises.readFile(metadataPath)
+  return createHash(updateMetadataBuffer, 'sha256', 'hex')
+}
+
+export { getUpdateHashAsync }
 
 const getUpdateId = (pathToUpdate, updateHash) => {
   const combined = pathToUpdate + updateHash
