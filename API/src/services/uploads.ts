@@ -1,8 +1,21 @@
 import s from '../hooks/security'
 import { logger } from '../modules'
 import { deletePatchFile } from '../modules/expo/patch'
-import type { HookContextLike, PatchRecord } from '../types'
+import type { HookContextLike, PatchRecord, UploadRecord } from '../types'
 import { idMatch } from './lib/list-query'
+
+const broadcastUploadChange = (context: HookContextLike) => {
+  const result = context.result as UploadRecord | UploadRecord[] | undefined
+  const rows = Array.isArray(result) ? result : result ? [result] : []
+  const projects = new Set<string>()
+  for (const row of rows) {
+    if (typeof row?.project === 'string') projects.add(row.project)
+  }
+  const keys: Array<string | string[]> = ['uploads', 'published']
+  for (const project of projects) keys.push(['stats', project])
+  context.app.service('messages').create({ action: 'update', keys })
+  return context
+}
 
 // When an upload is deleted, walk every patch that references it (as
 // either from or to) and remove the patch file + DB row. Otherwise stale
@@ -57,10 +70,10 @@ export default {
       all: [],
       find: [],
       get: [],
-      create: [],
-      update: [],
-      patch: [],
-      remove: [],
+      create: [broadcastUploadChange],
+      update: [broadcastUploadChange],
+      patch: [broadcastUploadChange],
+      remove: [broadcastUploadChange],
     },
   },
 }
