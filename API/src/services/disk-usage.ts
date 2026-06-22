@@ -15,14 +15,23 @@ let loggedStatOnce = false
 let cache = null
 let cacheAt = 0
 
-const dirSize = (dir) => {
+const pathExists = async (p: string) => {
+  try {
+    await fs.promises.access(p)
+    return true
+  } catch (e) {
+    return false
+  }
+}
+
+const dirSize = async (dir) => {
   let total = 0
   const stack = [dir]
   while (stack.length) {
     const current = stack.pop()
     let entries
     try {
-      entries = fs.readdirSync(current, { withFileTypes: true })
+      entries = await fs.promises.readdir(current, { withFileTypes: true })
     } catch (e) {
       continue
     }
@@ -30,7 +39,7 @@ const dirSize = (dir) => {
       const full = path.join(current, entry.name)
       try {
         if (entry.isDirectory()) stack.push(full)
-        else if (entry.isFile()) total += fs.statSync(full).size
+        else if (entry.isFile()) total += (await fs.promises.stat(full)).size
       } catch (e) {
         /* ignore transient FS errors */
       }
@@ -39,17 +48,18 @@ const dirSize = (dir) => {
   return total
 }
 
-const computeSizes = () => {
+const computeSizes = async () => {
   // Walk UPDATES_ROOT splitting bytes between "regular" update bundles and
   // anything living inside a PATCH_DIR_NAME subfolder (bsdiff patch files).
   // Each upload has its own optional ._patches/ inside its extracted dir.
+  // Async fs keeps the walk off the main event loop under load.
   let updatesBytes = 0
   let patchesBytes = 0
 
-  const walk = (dir, depth = 0) => {
+  const walk = async (dir) => {
     let entries
     try {
-      entries = fs.readdirSync(dir, { withFileTypes: true })
+      entries = await fs.promises.readdir(dir, { withFileTypes: true })
     } catch (e) {
       return
     }
@@ -57,13 +67,13 @@ const computeSizes = () => {
       const full = path.join(dir, entry.name)
       if (entry.isDirectory()) {
         if (entry.name === PATCH_DIR_NAME) {
-          patchesBytes += dirSize(full)
+          patchesBytes += await dirSize(full)
         } else {
-          walk(full, depth + 1)
+          await walk(full)
         }
       } else if (entry.isFile()) {
         try {
-          updatesBytes += fs.statSync(full).size
+          updatesBytes += (await fs.promises.stat(full)).size
         } catch (e) {
           /* ignore */
         }
@@ -71,12 +81,15 @@ const computeSizes = () => {
     }
   }
 
-  if (fs.existsSync(UPDATES_ROOT)) walk(UPDATES_ROOT)
+  if (await pathExists(UPDATES_ROOT)) await walk(UPDATES_ROOT)
 
   let totalBytes = 0
   let freeBytes = 0
+  const statfsAsync = typeof fs.promises.statfs === 'function'
   try {
-    const stat = fs.statfsSync(DISK_STAT_PATH)
+    // Single call (no loop cost). Prefer the async API; fall back to sync on
+    // runtimes that don't expose fs.promises.statfs (older Bun builds).
+    const stat = statfsAsync ? await fs.promises.statfs(DISK_STAT_PATH) : fs.statfsSync(DISK_STAT_PATH)
     totalBytes = stat.blocks * stat.bsize
     freeBytes = stat.bavail * stat.bsize
     if (!loggedStatOnce) {
@@ -131,7 +144,7 @@ class Service {
       /* keep default */
     }
     if (cache && now - cacheAt < ttlMs) return cache
-    cache = computeSizes()
+    cache = await computeSizes()
     cacheAt = now
     return cache
   }

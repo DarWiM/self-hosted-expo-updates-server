@@ -30,14 +30,14 @@ const run = async (job: GenerationJob): Promise<GenerationResult> => {
   const { fromUpload, toUpload, platform, benefitRatio } = job
 
   // Integrity pre-flight — never diff against a broken bundle.
-  const fromHealth = isLaunchBundleHealthy(fromUpload, platform)
+  const fromHealth = await isLaunchBundleHealthy(fromUpload, platform)
   if (!fromHealth.healthy) {
     return {
       outcome: 'failed',
       error: `FROM bundle integrity: ${fromHealth.blocking.map((b) => b.message).join('; ')}`,
     }
   }
-  const toHealth = isLaunchBundleHealthy(toUpload, platform)
+  const toHealth = await isLaunchBundleHealthy(toUpload, platform)
   if (!toHealth.healthy) {
     return { outcome: 'failed', error: `TO bundle integrity: ${toHealth.blocking.map((b) => b.message).join('; ')}` }
   }

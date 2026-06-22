@@ -5,22 +5,31 @@ import * as path from 'path'
 import s from '../hooks/security'
 import { logger } from '../modules'
 import { generateSelfSigned } from '../modules/expo/certs'
-import { getMetadataSync } from '../modules/expo/helpers'
+import { getMetadataAsync } from '../modules/expo/helpers'
 import { checkSingleIntegrity } from '../modules/expo/integrity'
-import { deletePatchFile, getLaunchAssetPath, sumPatchesSize } from '../modules/expo/patch'
+import { deletePatchFile, getLaunchAssetPathAsync, sumPatchesSize } from '../modules/expo/patch'
 import type { AppLike, PatchRecord, UnknownRecord, UploadRecord } from '../types'
 
 const UPLOADS_ROOT = process.env.UPLOADS_ROOT || '/uploads'
 const UPDATES_ROOT = process.env.UPDATES_ROOT || '/updates'
 
-const dirSizeRecursive = (dir) => {
+const pathExists = async (p: string) => {
+  try {
+    await fs.promises.access(p)
+    return true
+  } catch (e) {
+    return false
+  }
+}
+
+const dirSizeRecursive = async (dir) => {
   let total = 0
   const stack = [dir]
   while (stack.length) {
     const cur = stack.pop()
     let entries
     try {
-      entries = fs.readdirSync(cur, { withFileTypes: true })
+      entries = await fs.promises.readdir(cur, { withFileTypes: true })
     } catch (e) {
       continue
     }
@@ -28,7 +37,7 @@ const dirSizeRecursive = (dir) => {
       const full = path.join(cur, entry.name)
       try {
         if (entry.isDirectory()) stack.push(full)
-        else if (entry.isFile()) total += fs.statSync(full).size
+        else if (entry.isFile()) total += (await fs.promises.stat(full)).size
       } catch (e) {
         /* ignore */
       }
@@ -61,7 +70,7 @@ class Service {
     // Pre-flight: refuse to release/rollback an upload whose files are
     // broken — clients would hit 404/corrupt-bundle errors. Warnings are
     // OK (e.g. updateId/updateHash missing from older records).
-    const integrity = checkSingleIntegrity(upload)
+    const integrity = await checkSingleIntegrity(upload)
     if (integrity.errorCount > 0) {
       const lines = integrity.issues
         .filter((i) => i.severity === 'error')
@@ -96,25 +105,25 @@ class Service {
     // was there and got removed", "file already gone", and "rm failed".
     // Surfaces in the cleanup toast as zips/dirs removed/missing counts.
     const fileOps = []
-    const removeOne = (filePath, type, opts = {}) => {
+    const removeOne = async (filePath, type, opts = {}) => {
       if (!filePath) {
         fileOps.push({ type, path: null, existed: false, removed: false, skipped: 'no path in db' })
         return
       }
-      const existed = fs.existsSync(filePath)
+      const existed = await pathExists(filePath)
       let removed = false
       let error = null
       try {
-        fs.rmSync(filePath, { force: true, ...opts })
-        removed = !fs.existsSync(filePath)
+        await fs.promises.rm(filePath, { force: true, ...opts })
+        removed = !(await pathExists(filePath))
       } catch (e) {
         error = e.message
       }
       fileOps.push({ type, path: filePath, existed, removed, error })
     }
 
-    removeOne(upload.path, 'extracted-dir', { recursive: true })
-    removeOne(upload.filename, 'zip-archive')
+    await removeOne(upload.path, 'extracted-dir', { recursive: true })
+    await removeOne(upload.filename, 'zip-archive')
 
     // Cascade-remove dependent patches. Their disk files referenced the
     // upload we just wiped, so the patches are unrecoverable; the asset
@@ -214,7 +223,7 @@ class Service {
 
     // Orphan zips — global scan of UPLOADS_ROOT.
     try {
-      const entries = fs.readdirSync(UPLOADS_ROOT, { withFileTypes: true })
+      const entries = await fs.promises.readdir(UPLOADS_ROOT, { withFileTypes: true })
       for (const e of entries) {
         if (!e.isFile()) continue
         if (e.name.startsWith('.')) continue // skip .gitkeep, dotfiles
@@ -222,7 +231,7 @@ class Service {
         if (knownZips.has(full)) continue
         let st = null
         try {
-          st = fs.statSync(full)
+          st = await fs.promises.stat(full)
         } catch (err) {
           continue
         }
@@ -241,13 +250,13 @@ class Service {
     // Orphan dirs — per-project scan of UPDATES_ROOT/<project>/<version>/<id>.
     const projectDir = path.join(UPDATES_ROOT, project)
     try {
-      const versions = fs.readdirSync(projectDir, { withFileTypes: true })
+      const versions = await fs.promises.readdir(projectDir, { withFileTypes: true })
       for (const v of versions) {
         if (!v.isDirectory()) continue
         const versionDir = path.join(projectDir, v.name)
         let uploadDirs
         try {
-          uploadDirs = fs.readdirSync(versionDir, { withFileTypes: true })
+          uploadDirs = await fs.promises.readdir(versionDir, { withFileTypes: true })
         } catch (e) {
           continue
         }
@@ -258,11 +267,11 @@ class Service {
 
           let mtime = null
           try {
-            mtime = fs.statSync(full).mtime
+            mtime = (await fs.promises.stat(full)).mtime
           } catch (e) {
             /* ignore */
           }
-          const sizeBytes = dirSizeRecursive(full)
+          const sizeBytes = await dirSizeRecursive(full)
 
           orphans.push({
             type: 'dir',
@@ -297,13 +306,13 @@ class Service {
     if (!targetPath.startsWith(UPLOADS_ROOT + '/') && !targetPath.startsWith(UPDATES_ROOT + '/')) {
       throw new Err.BadRequest('Refusing to delete path outside managed roots')
     }
-    const existed = fs.existsSync(targetPath)
+    const existed = await pathExists(targetPath)
     try {
-      fs.rmSync(targetPath, { force: true, recursive: type === 'dir' })
+      await fs.promises.rm(targetPath, { force: true, recursive: type === 'dir' })
     } catch (e) {
       throw new Err.GeneralError(`Delete failed: ${e.message}`)
     }
-    const removed = !fs.existsSync(targetPath)
+    const removed = !(await pathExists(targetPath))
     return { path: targetPath, existed, removed }
   }
 
@@ -331,7 +340,7 @@ class Service {
       // integrity walker would otherwise flag every missing-file category as
       // an error against them. Skip — they're tombstones, not problems.
       if (up?.status === 'deleted') continue
-      const { issues, errorCount, warningCount } = checkSingleIntegrity(up)
+      const { issues, errorCount, warningCount } = await checkSingleIntegrity(up)
       if (!issues.length) continue
 
       for (const iss of issues) {
@@ -486,7 +495,7 @@ class Service {
     let zipBytes = 0
     if (upload.filename) {
       try {
-        zipBytes = fs.statSync(upload.filename).size
+        zipBytes = (await fs.promises.stat(upload.filename)).size
       } catch (e) {
         zipBytes = Number(upload.size) || 0
       }
@@ -509,7 +518,7 @@ class Service {
 
     let metadata = null
     try {
-      ;({ metadataJson: metadata } = getMetadataSync(upload))
+      ;({ metadataJson: metadata } = await getMetadataAsync(upload))
     } catch (e) {
       /* no metadata */
     }
@@ -520,8 +529,8 @@ class Service {
       // module owns it because it's the same lookup the patch flow uses.
       for (const platform of ['ios', 'android']) {
         try {
-          const bundleFull = getLaunchAssetPath(upload, platform)
-          result.bundleByPlatform[platform] = fs.statSync(bundleFull).size
+          const bundleFull = await getLaunchAssetPathAsync(upload, platform)
+          result.bundleByPlatform[platform] = (await fs.promises.stat(bundleFull)).size
         } catch (e) {
           /* missing or no bundle for this platform */
         }
@@ -541,7 +550,7 @@ class Service {
       for (const assetPath of allPaths) {
         try {
           const full = path.join(upload.path, assetPath)
-          result.assetsBytes += fs.statSync(full).size
+          result.assetsBytes += (await fs.promises.stat(full)).size
         } catch (e) {
           /* missing */
         }

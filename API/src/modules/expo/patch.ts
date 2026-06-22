@@ -2,7 +2,7 @@ import * as crypto from 'crypto'
 import * as fs from 'fs'
 import * as path from 'path'
 
-import { getMetadataSync } from './helpers'
+import { getMetadataAsync, getMetadataSync } from './helpers'
 
 const PATCH_BENEFIT_RATIO = 0.75
 const PATCH_DIR_NAME = '_patches'
@@ -26,6 +26,17 @@ const sha256 = (buffer) => crypto.createHash('sha256').update(buffer).digest('he
 
 export const getLaunchAssetPath = (upload, platform) => {
   const { metadataJson } = getMetadataSync(upload)
+  const platformMeta = metadataJson?.fileMetadata?.[platform]
+  if (!platformMeta?.bundle) {
+    throw new Error(`No bundle for platform ${platform} in update ${upload.updateId}`)
+  }
+  return path.join(upload.path, platformMeta.bundle)
+}
+
+// Async sibling for main-loop callers (integrity guard, asset hot path, admin
+// size walk). The sync version stays for the patch worker thread.
+export const getLaunchAssetPathAsync = async (upload, platform) => {
+  const { metadataJson } = await getMetadataAsync(upload)
   const platformMeta = metadataJson?.fileMetadata?.[platform]
   if (!platformMeta?.bundle) {
     throw new Error(`No bundle for platform ${platform} in update ${upload.updateId}`)

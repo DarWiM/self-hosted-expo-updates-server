@@ -71,7 +71,7 @@ If you have Docker installed you clone this project you and play around by runni
 ## Deploy on your server
 
 If you use Docker you can find a production-ready docker-compose files under the Docker folder, just copy Docker/production on your server, set your secrets / credentials and you are ready to go. The two docker images are public and ready to go.
-Explanation for the Environment settings is in the docker-compose file. For production reverse proxy with Apache take a look at **README DOCKER.md**
+Explanation for the Environment settings is in the docker-compose file. For production reverse proxy setup (Apache and Nginx examples) take a look at [Deployment & Reverse Proxy](docs/deployment.md).
 
 Otherwise you can build from code: the API server lives under the `API` folder and the dashboard under the `Web` folder.
 
@@ -183,7 +183,7 @@ How it works:
 ### Enabling it
 
 1. **Server side:** turn on the `bsdiff` toggle for the app in the Web UI. This controls whether the server generates and serves patches for that app.
-2. **Client side:** on SDK 55+ bsdiff patch support is **on by default** — the [`expo-updates`](https://docs.expo.dev/versions/latest/sdk/updates/) config property `updates.enableBsdiffPatchSupport` defaults to `true`, so a standard build already accepts patches. You only need to touch it if it was previously disabled:
+2. **Client side:** the [`expo-updates`](https://docs.expo.dev/versions/latest/sdk/updates/) config property `updates.enableBsdiffPatchSupport` controls this. It **defaults to `true` on SDK 56+** (a standard build already accepts patches — only act if it was disabled), but **defaults to `false` on SDK 55**, where you must enable it explicitly:
 
    ```json
    {
@@ -223,7 +223,6 @@ How it works:
 
 > 📷 **Screenshot:** _Worker settings tab — live-configurable tick / cooldown / concurrency / benefit ratio_
 > ![Worker settings](https://github.com/user-attachments/assets/bce7349e-2793-47b9-b67e-db97ff870ac6)
-
 
 ## Pre-release integrity checks
 

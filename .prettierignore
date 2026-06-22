@@ -12,7 +12,6 @@
 !eslint.config.mjs
 !package.json
 !README.md
-!README DOCKER.md
 
 !API/
 !API/package.json
