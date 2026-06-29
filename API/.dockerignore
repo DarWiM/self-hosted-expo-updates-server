@@ -8,3 +8,7 @@ Dockerfile.dev
 vendor/bsdiff/dist
 vendor/bsdiff/bsdiff.tgz
 vendor/bsdiff/rust/hdiff-wasm/target
+
+# Test files excluded from production image
+test
+**/*.test.ts
