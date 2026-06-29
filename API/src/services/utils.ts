@@ -80,7 +80,12 @@ class Service {
     }
 
     const uploads = (await this.app.service('uploads').find({
-      query: { project: upload.project, version: upload.version, releaseChannel: upload.releaseChannel },
+      query: {
+        project: upload.project,
+        version: upload.version,
+        releaseChannel: upload.releaseChannel,
+        status: { $ne: 'deleted' },
+      },
     })) as UploadRecord[]
 
     await Promise.all(
