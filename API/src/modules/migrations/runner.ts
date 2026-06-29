@@ -2,6 +2,8 @@ import type { Db } from 'mongodb'
 import * as fs from 'fs'
 import * as path from 'path'
 
+import { isDuplicateKeyError } from '../mongo-errors'
+
 export type MigrationModule = {
   up: (db: Db) => Promise<void>
   down?: (db: Db) => Promise<void>
@@ -48,7 +50,7 @@ async function acquireLock(db: Db): Promise<void> {
   try {
     await db.collection(LOCK_COLLECTION).insertOne({ _id: LOCK_ID, acquiredAt: new Date() } as never)
   } catch (e) {
-    if ((e as { code?: number })?.code === 11000) {
+    if (isDuplicateKeyError(e)) {
       throw new Error('Migration lock held by another runner; aborting.')
     }
     throw e

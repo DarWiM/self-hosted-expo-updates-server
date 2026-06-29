@@ -5,6 +5,7 @@ import * as path from 'path'
 import { getBsdiffSettings } from '../../services/bsdiff-settings'
 import type { LoggerLike } from '../../types'
 import loggerDefault from '../logger'
+import { isDuplicateKeyError } from '../mongo-errors'
 import { isLaunchBundleHealthy } from './integrity'
 import { getLaunchAssetPathAsync } from './patch'
 const logger: LoggerLike = loggerDefault
@@ -247,7 +248,7 @@ const tryHandlePatch = async (app, { query, headers }, fallback) => {
       })
       .catch((e) => {
         // unique-index violation = someone else already enqueued; safe to ignore
-        if (e?.code !== 11000 && !String(e?.message || '').includes('duplicate key')) {
+        if (!isDuplicateKeyError(e)) {
           logger.warn('asset.patch: enqueue failed', { error: e.message })
         }
       })
