@@ -5,6 +5,7 @@ import { feathers } from '@feathersjs/feathers'
 
 import { feathersconfig, logger } from './modules'
 import type { FeathersExpressLike } from './modules/feathers.config'
+import { runBootMigrations } from './modules/migrations/boot'
 
 const express = expressModule as unknown as FeathersExpressLike
 
@@ -28,8 +29,14 @@ const createAdminIfMissing = async () => {
   }
 }
 
-app.listen(app.get('port')).then(() => {
-  logger.info(`Feathers application started on http://${app.get('host')}:${app.get('port')}`)
-  logger.info(`Env: ${process.env.NODE_ENV} DB: ${app.get('mongodb')}`)
-  setTimeout(createAdminIfMissing, 3000)
-})
+runBootMigrations(app)
+  .then(() => app.listen(app.get('port')))
+  .then(() => {
+    logger.info(`Feathers application started on http://${app.get('host')}:${app.get('port')}`)
+    logger.info(`Env: ${process.env.NODE_ENV} DB: ${app.get('mongodb')}`)
+    setTimeout(createAdminIfMissing, 3000)
+  })
+  .catch((e) => {
+    logger.error('Startup failed (migrations or listen); not serving.', e)
+    process.exit(1)
+  })
