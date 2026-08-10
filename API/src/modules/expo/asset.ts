@@ -138,6 +138,11 @@ const tryHandlePatch = async (app, { query, headers }, fallback) => {
   }
   if (!toUpload || !fromUpload) return fallback
 
+  // A patch may never target an embedded record — embedded bundles are baked
+  // into the native build and never downloaded, so a patch *to* one is
+  // meaningless. embedded → OTA (FROM embedded) is the whole point and stays.
+  if (toUpload.embedded) return fallback
+
   // Cross-version safety
   if (toUpload.project !== project) return fallback
   if (toUpload.project !== fromUpload.project) return fallback
