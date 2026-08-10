@@ -3,7 +3,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 
 import { getBsdiffSettings } from '../../services/bsdiff-settings'
-import type { LoggerLike } from '../../types'
+import type { LoggerLike, UploadRecord } from '../../types'
 import loggerDefault from '../logger'
 import { isDuplicateKeyError } from '../mongo-errors'
 import { isLaunchBundleHealthy } from './integrity'
@@ -76,6 +76,20 @@ const decidePatchAction = (existing, now) => {
   return { decision: 'fallback' }
 }
 
+// FROM candidates all share the client-reported updateId, but an embedded
+// base's explicit id can repeat across release channels — the channel isn't
+// part of the JS bundle, so byte-identical preview/production builds can mint
+// the same id. Pick the candidate on the target's channel + runtime version;
+// the later cross-version guard then holds by construction. A server-minted OTA
+// id is globally unique, so for OTA→OTA there is only ever one candidate.
+// Returns null when nothing matches.
+export const pickFromUpload = (candidates: UploadRecord[], toUpload: UploadRecord): UploadRecord | null => {
+  for (const c of candidates) {
+    if (c.releaseChannel === toUpload.releaseChannel && c.version === toUpload.version) return c
+  }
+  return null
+}
+
 const isLaunchAssetPath = async (assetPath, upload, platform) => {
   try {
     const expected = path.resolve(await getLaunchAssetPathAsync(upload, platform))
@@ -105,15 +119,19 @@ const tryHandlePatch = async (app, { query, headers }, fallback) => {
   }
   if (!application?.bsdiffEnabled) return fallback
 
-  // Resolve uploads
+  // Resolve uploads. TO is keyed by the server-minted (globally unique)
+  // updateId, so one row is unambiguous. FROM may be an embedded base whose
+  // explicit id repeats across channels, so fetch ALL candidates and let
+  // pickFromUpload choose the one on the target's channel + version.
   let toUpload, fromUpload
   try {
     const [toMatches, fromMatches] = await Promise.all([
       app.service('uploads').find({ query: { updateId: requestedUpdateId, $limit: 1 } }),
-      app.service('uploads').find({ query: { updateId: currentUpdateId, $limit: 1 } }),
+      app.service('uploads').find({ query: { updateId: currentUpdateId } }),
     ])
     toUpload = toMatches?.[0] || toMatches?.data?.[0]
-    fromUpload = fromMatches?.[0] || fromMatches?.data?.[0]
+    const fromList = (Array.isArray(fromMatches) ? fromMatches : fromMatches?.data || []) as UploadRecord[]
+    fromUpload = toUpload ? pickFromUpload(fromList, toUpload) : null
   } catch (e) {
     logger.warn('asset.patch: upload lookup failed', { error: e.message })
     return fallback
