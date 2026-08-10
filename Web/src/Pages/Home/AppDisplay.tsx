@@ -4,7 +4,7 @@ import moment from 'moment'
 import { Column } from 'primereact/column'
 import { DataTable } from 'primereact/datatable'
 
-import { Button, Card, Colors, Flex, Spinner, StatusPill, Text } from '../../Components'
+import { Button, Card, Colors, EmbeddedTag, Flex, Spinner, StatusPill, Text } from '../../Components'
 import { useCollapsedState, useCQuery } from '../../Services'
 import type { AppRecord, ListResult, UploadRecord } from '../../types'
 import { listFromResult } from '../../types'
@@ -106,9 +106,10 @@ const UpdateIdCell = ({ row, onOpen }: { row: UpdateRow; onOpen: (row: UpdateRow
         }>
         {row.updateId}
       </span>
-      {row.status && (
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-          <StatusPill status={row.status} />
+      {(row.status || row.upload?.embedded) && (
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+          {row.status && <StatusPill status={row.status} />}
+          {row.upload?.embedded && <EmbeddedTag platform={row.upload.platform} />}
         </div>
       )}
       {embedded && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', lineHeight: 1.2 }}>{embedded}</div>}

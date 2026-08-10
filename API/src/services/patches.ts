@@ -165,6 +165,9 @@ class PatchesService extends MongoDBService {
     if (!toUploadId) throw new Err.BadRequest('Missing toUploadId')
     const to = (await this.app.service('uploads').get(toUploadId)) as UploadRecord
     if (!to) throw new Err.NotFound('Target update not found')
+    // Embedded records are from-bases only — never a patch target — so they have
+    // no patch sources to offer.
+    if (to.embedded) throw new Err.BadRequest('Embedded records cannot be a patch target')
 
     const found = await this.app.service('uploads').find({
       query: {
@@ -223,6 +226,10 @@ class PatchesService extends MongoDBService {
     if (from.version !== to.version) throw new Err.BadRequest('Updates have different runtime versions')
     if (from.releaseChannel !== to.releaseChannel) throw new Err.BadRequest('Updates are on different release channels')
     if (!from.updateId || !to.updateId) throw new Err.BadRequest('Both updates must have an updateId')
+    // Embedded records are bsdiff from-bases only; a patch may never target one
+    // (devices never request a patch *to* an embedded bundle). embedded → OTA is
+    // fine, so only the target is checked.
+    if (to.embedded) throw new Err.BadRequest('Cannot create a patch targeting an embedded record')
 
     const platforms = getAvailablePlatforms(from).filter((p) => getAvailablePlatforms(to).includes(p))
     if (!platforms.length) throw new Err.BadRequest('No common platform bundles between the two updates')

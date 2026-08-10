@@ -401,7 +401,9 @@ const DirectionalTable = ({
           <PlatformCell
             pair={pair}
             render={(p) => (
-              <span style={{ fontVariantNumeric: 'tabular-nums' }}>{formatDate(p?.completedAt || p?.createdAt)}</span>
+              <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+                {formatDate((p?.completedAt || p?.createdAt) as string | undefined)}
+              </span>
             )}
             total={
               <span style={{ fontVariantNumeric: 'tabular-nums' }}>{formatDate(pair.latestCreatedAt as string)}</span>
@@ -570,23 +572,28 @@ const PATCH_STATUS_OPTIONS = ['pending', 'generating', 'validating', 'ready', 'f
 }))
 const PATCH_PLATFORM_OPTIONS = ['ios', 'android'].map((s) => ({ label: s, value: s }))
 
-const PatchesTab = ({ uploadId, project }: { uploadId: string; project?: string }) => {
+const PatchesTab = ({ uploadId, project, embedded }: { uploadId: string; project?: string; embedded?: boolean }) => {
   // Clicking a counterpart opens the pair detail window, which is where patches
   // are deleted (the tables themselves have no delete button).
   const [selectedPair, setSelectedPair] = useState<Record<string, unknown> | null>(null)
 
   return (
     <div style={{ width: '100%', display: 'block', boxSizing: 'border-box' }}>
-      <Section title="Incoming patches  ·  other → this" style={{ marginTop: 0 }} collapsible>
-        <DirectionalTable
-          base={{ project, toUploadId: uploadId }}
-          counterpartField="fromUpdateId"
-          label="From"
-          onOpenPair={setSelectedPair}
-        />
-      </Section>
+      {/* An embedded record can never be a patch target, so incoming patches
+          (other → this) and creating patches toward it are both meaningless.
+          Only outgoing patches (embedded → OTA) apply. */}
+      {!embedded && (
+        <Section title="Incoming patches  ·  other → this" style={{ marginTop: 0 }} collapsible>
+          <DirectionalTable
+            base={{ project, toUploadId: uploadId }}
+            counterpartField="fromUpdateId"
+            label="From"
+            onOpenPair={setSelectedPair}
+          />
+        </Section>
+      )}
 
-      <Section title="Outgoing patches  ·  this → other" collapsible>
+      <Section title="Outgoing patches  ·  this → other" style={embedded ? { marginTop: 0 } : undefined} collapsible>
         <DirectionalTable
           base={{ project, fromUploadId: uploadId }}
           counterpartField="toUpdateId"
@@ -595,9 +602,19 @@ const PatchesTab = ({ uploadId, project }: { uploadId: string; project?: string 
         />
       </Section>
 
-      <Section title="Create patches  ·  base → this" collapsible defaultCollapsed>
-        <CreatePatchTable uploadId={uploadId} project={project} />
-      </Section>
+      {embedded ? (
+        <Section title="Create patches">
+          <Text
+            value="Embedded records are bsdiff from-bases only and cannot be a patch target — no patches can be created toward this record."
+            size={12}
+            color="rgba(255,255,255,0.6)"
+          />
+        </Section>
+      ) : (
+        <Section title="Create patches  ·  base → this" collapsible defaultCollapsed>
+          <CreatePatchTable uploadId={uploadId} project={project} />
+        </Section>
+      )}
 
       {selectedPair && <PatchPairDetail pair={selectedPair} onClose={() => setSelectedPair(null)} />}
     </div>
@@ -606,7 +623,27 @@ const PatchesTab = ({ uploadId, project }: { uploadId: string; project?: string 
 
 const OverviewTab = ({ update }: { update: UploadRecord }) => (
   <div style={{ width: '100%', display: 'block', boxSizing: 'border-box' }}>
+    {update.embedded && (
+      <div
+        style={{
+          padding: '8px 12px',
+          borderRadius: 6,
+          marginBottom: 12,
+          background: 'rgba(124, 92, 255, 0.12)',
+          border: '1px solid rgba(124, 92, 255, 0.4)',
+        }}>
+        <Text
+          value={`Embedded from-base${update.platform ? ` · ${update.platform}` : ''} — a bsdiff base for the first OTA after install, not a servable update.`}
+          size={12}
+          color="#c9bbff"
+          bold
+        />
+      </div>
+    )}
     <Section title="Identity" style={{ marginTop: 0 }}>
+      {update.embedded && (
+        <Row label="Type" value={`Embedded from-base${update.platform ? ` (${update.platform})` : ''}`} />
+      )}
       <Row label="Update ID" value={update.updateId || 'Not Released'} mono />
       <Row label="Update Hash" value={update.updateHash} mono />
       <Row label="Path" value={update.path || 'none'} mono />
@@ -675,7 +712,7 @@ export const UpdateInfo = ({
         {update.status !== 'deleted' && (
           <TabPanel header="Patches">
             <div style={{ width: '100%', minHeight: 600 }}>
-              <PatchesTab uploadId={update._id} project={update.project} />
+              <PatchesTab uploadId={update._id} project={update.project} embedded={update.embedded} />
             </div>
           </TabPanel>
         )}

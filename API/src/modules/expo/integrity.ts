@@ -54,25 +54,30 @@ export const checkSingleIntegrity = async (up) => {
       err('metadata', `metadata.json: ${e.message}`)
     }
 
-    const appJsonPath = path.join(up.path, 'app.json')
-    if (!(await pathExists(appJsonPath))) err('app-json', 'app.json missing')
-    else if (!(await isReadable(appJsonPath))) err('app-json', 'app.json not readable')
-    else {
-      try {
-        JSON.parse(await fs.promises.readFile(appJsonPath, 'utf-8'))
-      } catch (e) {
-        err('app-json', `app.json invalid JSON: ${e.message}`)
+    // Embedded from-bases ship only metadata.json + the launch bundle — no
+    // app.json/package.json/assets by contract — so those checks would flag a
+    // healthy embedded record as broken. Only enforce them for normal uploads.
+    if (!up.embedded) {
+      const appJsonPath = path.join(up.path, 'app.json')
+      if (!(await pathExists(appJsonPath))) err('app-json', 'app.json missing')
+      else if (!(await isReadable(appJsonPath))) err('app-json', 'app.json not readable')
+      else {
+        try {
+          JSON.parse(await fs.promises.readFile(appJsonPath, 'utf-8'))
+        } catch (e) {
+          err('app-json', `app.json invalid JSON: ${e.message}`)
+        }
       }
-    }
 
-    const pkgPath = path.join(up.path, 'package.json')
-    if (!(await pathExists(pkgPath))) err('package-json', 'package.json missing')
-    else if (!(await isReadable(pkgPath))) err('package-json', 'package.json not readable')
-    else {
-      try {
-        JSON.parse(await fs.promises.readFile(pkgPath, 'utf-8'))
-      } catch (e) {
-        err('package-json', `package.json invalid JSON: ${e.message}`)
+      const pkgPath = path.join(up.path, 'package.json')
+      if (!(await pathExists(pkgPath))) err('package-json', 'package.json missing')
+      else if (!(await isReadable(pkgPath))) err('package-json', 'package.json not readable')
+      else {
+        try {
+          JSON.parse(await fs.promises.readFile(pkgPath, 'utf-8'))
+        } catch (e) {
+          err('package-json', `package.json invalid JSON: ${e.message}`)
+        }
       }
     }
 

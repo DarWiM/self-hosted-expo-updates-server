@@ -11,6 +11,7 @@ import {
   Colors,
   ConfirmDialog,
   DateRangeFilter,
+  EmbeddedTag,
   Flex,
   InlineMultiToggle,
   Spinner,
@@ -26,12 +27,15 @@ import { PatchesPanel } from './PatchesPanel'
 import { Release } from './Release'
 import { UpdateInstructions } from './UpdateInstructions'
 
-// Register an inclusive-day date-range matcher once at module load.
-// `value` is the row's cell (ISO string from `createdAt`); `filter` is the
-// PrimeReact filter value, which our DateRangeFilter feeds as [Date, Date].
-// Mirrors the server-side semantics in useLazyTable: snap from→00:00 and
-// to→23:59:59.999 so day boundaries are inclusive on both ends.
-FilterService.register('dateRange', (value: unknown, filter: unknown) => {
+// Register an inclusive-day date-range matcher once at module load. Registered
+// under FilterMatchMode.CUSTOM (the only custom matcher in the app) so the
+// matchMode stays within PrimeReact's typed union — a bare 'dateRange' name
+// isn't in the union type. `value` is the row's cell (ISO string from
+// `createdAt`); `filter` is the PrimeReact filter value, which our
+// DateRangeFilter feeds as [Date, Date]. Mirrors the server-side semantics in
+// useLazyTable: snap from→00:00 and to→23:59:59.999 so day boundaries are
+// inclusive on both ends.
+FilterService.register(FilterMatchMode.CUSTOM, (value: unknown, filter: unknown) => {
   if (!Array.isArray(filter)) return true
   const [from, to] = filter as [Date | null, Date | null]
   if (!from && !to) return true
@@ -302,23 +306,26 @@ const IntegrityCheckSection = ({
                 sortable
                 filter
                 body={(row) => (
-                  <span
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleOpen(row)
-                    }}
-                    title={opening === row._id ? 'Loading…' : 'Open update details'}
-                    style={{
-                      fontFamily: 'ui-monospace, Menlo, monospace',
-                      fontSize: 12,
-                      wordBreak: 'break-all',
-                      cursor: 'pointer',
-                      color: Colors.primary,
-                      textDecoration: 'underline dotted',
-                      opacity: opening === row._id ? 0.5 : 1,
-                    }}>
-                    {row.updateId || '—'}
-                  </span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                    <span
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleOpen(row)
+                      }}
+                      title={opening === row._id ? 'Loading…' : 'Open update details'}
+                      style={{
+                        fontFamily: 'ui-monospace, Menlo, monospace',
+                        fontSize: 12,
+                        wordBreak: 'break-all',
+                        cursor: 'pointer',
+                        color: Colors.primary,
+                        textDecoration: 'underline dotted',
+                        opacity: opening === row._id ? 0.5 : 1,
+                      }}>
+                      {row.updateId || '—'}
+                    </span>
+                    {row.embedded && <EmbeddedTag platform={row.platform} />}
+                  </div>
                 )}
               />
               <Column
@@ -549,23 +556,26 @@ const OldUpdatesCleanupSection = ({
                 sortable
                 filter
                 body={(row) => (
-                  <span
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleOpenCandidate(row)
-                    }}
-                    title={opening === row._id ? 'Loading…' : 'Open update details'}
-                    style={{
-                      fontFamily: 'ui-monospace, Menlo, monospace',
-                      fontSize: 12,
-                      wordBreak: 'break-all',
-                      cursor: 'pointer',
-                      color: Colors.primary,
-                      textDecoration: 'underline dotted',
-                      opacity: opening === row._id ? 0.5 : 1,
-                    }}>
-                    {row.updateId || '—'}
-                  </span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                    <span
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleOpenCandidate(row)
+                      }}
+                      title={opening === row._id ? 'Loading…' : 'Open update details'}
+                      style={{
+                        fontFamily: 'ui-monospace, Menlo, monospace',
+                        fontSize: 12,
+                        wordBreak: 'break-all',
+                        cursor: 'pointer',
+                        color: Colors.primary,
+                        textDecoration: 'underline dotted',
+                        opacity: opening === row._id ? 0.5 : 1,
+                      }}>
+                      {row.updateId || '—'}
+                    </span>
+                    {row.embedded && <EmbeddedTag platform={row.platform} />}
+                  </div>
                 )}
               />
               <Column
@@ -953,7 +963,7 @@ export const ReleaseManager = ({ app }: { app: AppRecord }) => {
     releaseChannel: { value: null, matchMode: FilterMatchMode.IN },
     version: { value: null, matchMode: FilterMatchMode.IN },
     status: { value: null, matchMode: FilterMatchMode.IN },
-    createdAt: { value: null, matchMode: 'dateRange' },
+    createdAt: { value: null, matchMode: FilterMatchMode.CUSTOM },
   })
   // 'deleted' uploads are filtered at the data layer so the Status column's
   // funnel icon doesn't show as "active" on first paint. Toggle to surface
@@ -1058,22 +1068,25 @@ export const ReleaseManager = ({ app }: { app: AppRecord }) => {
               filter
               sortable
               body={(row) => (
-                <span
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setUpdate(row)
-                  }}
-                  title="Open update details"
-                  style={{
-                    fontFamily: 'ui-monospace, Menlo, monospace',
-                    fontSize: 12,
-                    wordBreak: 'break-all',
-                    cursor: 'pointer',
-                    color: Colors.primary,
-                    textDecoration: 'underline dotted',
-                  }}>
-                  {row.updateId || '—'}
-                </span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setUpdate(row)
+                    }}
+                    title="Open update details"
+                    style={{
+                      fontFamily: 'ui-monospace, Menlo, monospace',
+                      fontSize: 12,
+                      wordBreak: 'break-all',
+                      cursor: 'pointer',
+                      color: Colors.primary,
+                      textDecoration: 'underline dotted',
+                    }}>
+                    {row.updateId || '—'}
+                  </span>
+                  {row.embedded && <EmbeddedTag platform={row.platform} />}
+                </div>
               )}
             />
             <Column
