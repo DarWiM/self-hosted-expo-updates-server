@@ -336,7 +336,7 @@ class Service {
    * exactly one row in `problems` (or none, if the upload is clean) —
    * the Release dialog uses this to gate the Release/Rollback action.
    */
-  async checkIntegrity({ project, uploadId }) {
+  async checkIntegrity({ project, uploadId }: { project?: string; uploadId?: string }) {
     if (!project && !uploadId) throw new Err.BadRequest('Missing project or uploadId')
 
     const uploads = uploadId
@@ -364,6 +364,8 @@ class Service {
         version: up.version,
         releaseChannel: up.releaseChannel,
         status: up.status,
+        embedded: up.embedded,
+        platform: up.platform,
         createdAt: up.createdAt,
         issues,
         errorCount,
@@ -448,6 +450,8 @@ class Service {
         releaseChannel: up.releaseChannel,
         gitCommit: up.gitCommit,
         status: up.status,
+        embedded: up.embedded,
+        platform: up.platform,
         createdAt: up.createdAt,
         sizeBytes,
       })
