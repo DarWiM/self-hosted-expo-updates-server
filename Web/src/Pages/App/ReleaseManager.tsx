@@ -27,12 +27,15 @@ import { PatchesPanel } from './PatchesPanel'
 import { Release } from './Release'
 import { UpdateInstructions } from './UpdateInstructions'
 
-// Register an inclusive-day date-range matcher once at module load.
-// `value` is the row's cell (ISO string from `createdAt`); `filter` is the
-// PrimeReact filter value, which our DateRangeFilter feeds as [Date, Date].
-// Mirrors the server-side semantics in useLazyTable: snap from→00:00 and
-// to→23:59:59.999 so day boundaries are inclusive on both ends.
-FilterService.register('dateRange', (value: unknown, filter: unknown) => {
+// Register an inclusive-day date-range matcher once at module load. Registered
+// under FilterMatchMode.CUSTOM (the only custom matcher in the app) so the
+// matchMode stays within PrimeReact's typed union — a bare 'dateRange' name
+// isn't in the union type. `value` is the row's cell (ISO string from
+// `createdAt`); `filter` is the PrimeReact filter value, which our
+// DateRangeFilter feeds as [Date, Date]. Mirrors the server-side semantics in
+// useLazyTable: snap from→00:00 and to→23:59:59.999 so day boundaries are
+// inclusive on both ends.
+FilterService.register(FilterMatchMode.CUSTOM, (value: unknown, filter: unknown) => {
   if (!Array.isArray(filter)) return true
   const [from, to] = filter as [Date | null, Date | null]
   if (!from && !to) return true
@@ -960,7 +963,7 @@ export const ReleaseManager = ({ app }: { app: AppRecord }) => {
     releaseChannel: { value: null, matchMode: FilterMatchMode.IN },
     version: { value: null, matchMode: FilterMatchMode.IN },
     status: { value: null, matchMode: FilterMatchMode.IN },
-    createdAt: { value: null, matchMode: 'dateRange' },
+    createdAt: { value: null, matchMode: FilterMatchMode.CUSTOM },
   })
   // 'deleted' uploads are filtered at the data layer so the Status column's
   // funnel icon doesn't show as "active" on first paint. Toggle to surface

@@ -401,7 +401,9 @@ const DirectionalTable = ({
           <PlatformCell
             pair={pair}
             render={(p) => (
-              <span style={{ fontVariantNumeric: 'tabular-nums' }}>{formatDate(p?.completedAt || p?.createdAt)}</span>
+              <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+                {formatDate((p?.completedAt || p?.createdAt) as string | undefined)}
+              </span>
             )}
             total={
               <span style={{ fontVariantNumeric: 'tabular-nums' }}>{formatDate(pair.latestCreatedAt as string)}</span>
