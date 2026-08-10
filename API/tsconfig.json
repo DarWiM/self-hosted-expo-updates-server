@@ -22,6 +22,6 @@
     "strictNullChecks": false,
     "ignoreDeprecations": "6.0"
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "migrations/**/*", "test/**/*"],
   "exclude": ["node_modules"]
 }

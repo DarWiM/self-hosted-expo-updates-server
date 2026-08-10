@@ -66,6 +66,12 @@ class Service {
     if (upload.status === 'deleted') {
       throw new Err.BadRequest('Cannot release: this update has been deleted (disk files are gone)')
     }
+    // An embedded record is a bsdiff from-base, not a servable update: it has no
+    // asset manifest, so releasing it would hand devices an assetless OTA. The
+    // UI hides Release for embedded rows; this guards the API path too.
+    if (upload.embedded) {
+      throw new Err.BadRequest('Cannot release an embedded base record (bsdiff from-base, not a servable update)')
+    }
 
     // Pre-flight: refuse to release/rollback an upload whose files are
     // broken — clients would hit 404/corrupt-bundle errors. Warnings are
@@ -80,7 +86,12 @@ class Service {
     }
 
     const uploads = (await this.app.service('uploads').find({
-      query: { project: upload.project, version: upload.version, releaseChannel: upload.releaseChannel },
+      query: {
+        project: upload.project,
+        version: upload.version,
+        releaseChannel: upload.releaseChannel,
+        status: { $ne: 'deleted' },
+      },
     })) as UploadRecord[]
 
     await Promise.all(

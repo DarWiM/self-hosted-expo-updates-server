@@ -1,3 +1,4 @@
+import * as Err from '@feathersjs/errors'
 import * as crypto from 'crypto'
 import * as fs from 'fs'
 import mimeModule from 'mime'
@@ -171,3 +172,68 @@ const getUpdateId = (pathToUpdate, updateHash) => {
 }
 
 export { getUpdateId }
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const EMBEDDED_PLATFORMS: readonly string[] = ['ios', 'android']
+
+export interface EmbeddedMetadata {
+  embedded: boolean
+  updateId?: string
+  platform?: string
+}
+
+// An embedded artifact self-describes via metadata.json: `embedded: true`, an
+// explicit `updateId` (= app.manifest.id, a random UUID minted per native build,
+// which the server cannot re-derive), and a single-platform fileMetadata. See
+// the embedded-ingest contract v1. Non-embedded metadata returns
+// { embedded: false } so the caller keeps the normal server-derived-id path.
+export const parseEmbeddedMetadata = (metadataJson: unknown): EmbeddedMetadata => {
+  const meta = (metadataJson ?? {}) as Record<string, unknown>
+  if (meta.embedded !== true) return { embedded: false }
+
+  const updateId = meta.updateId
+  if (typeof updateId !== 'string' || !UUID_RE.test(updateId)) {
+    throw new Err.BadRequest('Embedded upload: metadata.updateId must be a UUID (from app.manifest.id)')
+  }
+
+  const fileMetadata = (meta.fileMetadata ?? {}) as Record<string, unknown>
+  const keys = Object.keys(fileMetadata)
+  if (keys.length !== 1) {
+    throw new Err.BadRequest('Embedded upload: metadata.fileMetadata must contain exactly one platform')
+  }
+  const platform = keys[0]
+  if (!EMBEDDED_PLATFORMS.includes(platform)) {
+    throw new Err.BadRequest(`Embedded upload: unknown platform "${platform}" (expected ios or android)`)
+  }
+
+  return { embedded: true, updateId, platform }
+}
+
+interface UploadsFindRemove {
+  find(params: { query: UnknownRecord }): Promise<unknown>
+  remove(id: unknown): Promise<unknown>
+}
+
+// Embedded ingest is idempotent per (project, version, releaseChannel, platform,
+// updateId): a rebuild shipping the same bytes re-uploads under the same explicit
+// id. Replace-on-ingest — delete any prior embedded record on that exact key (its
+// extracted dir + zip on disk, then the row) so duplicates never accumulate and
+// the partial-unique index over that key stays satisfiable. `keepId` is the
+// freshly-created upload we're finalizing; never touch it.
+export const replaceExistingEmbedded = async (
+  uploads: UploadsFindRemove,
+  key: { project?: string; version?: string; releaseChannel?: string; platform?: string; updateId?: string },
+  keepId: unknown,
+): Promise<{ removed: number }> => {
+  const found = await uploads.find({ query: { ...key, embedded: true } })
+  const list = (Array.isArray(found) ? found : (found as { data?: UploadRecord[] })?.data || []) as UploadRecord[]
+  let removed = 0
+  for (const old of list) {
+    if (String(old._id) === String(keepId)) continue
+    if (old.path) fs.rmSync(old.path, { recursive: true, force: true })
+    if (old.filename) fs.rmSync(old.filename, { force: true })
+    await uploads.remove(old._id)
+    removed++
+  }
+  return { removed }
+}

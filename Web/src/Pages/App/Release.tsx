@@ -50,6 +50,9 @@ export const Release = ({ update, onHide }: ReleaseProps) => {
   const isReleased = update?.status === 'released'
   const isObsolete = update?.status === 'obsolete'
   const isDeleted = update?.status === 'deleted'
+  // An embedded from-base is a bsdiff base, not a servable update — never
+  // offer Release for it (the server also refuses it; this hides the action).
+  const isEmbedded = !!update?.embedded
   const hasIntegrityErrors = (integrity?.errorCount || 0) > 0
 
   const ACTION_SUCCESS_VERB: Record<string, string> = {
@@ -130,8 +133,24 @@ export const Release = ({ update, onHide }: ReleaseProps) => {
               )}
             </div>
           )}
+          {isEmbedded && (
+            <div
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                borderRadius: 6,
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.15)',
+              }}>
+              <Text
+                value="Embedded from-base — a bsdiff base for the first OTA after install, not a servable update. Release is disabled."
+                size={12}
+                color="rgba(255,255,255,0.7)"
+              />
+            </div>
+          )}
           <Flex row fw jb>
-            {!isDeleted && (
+            {!isDeleted && !isEmbedded && (
               <Button
                 disabled={releaseDisabled}
                 icon="upload"

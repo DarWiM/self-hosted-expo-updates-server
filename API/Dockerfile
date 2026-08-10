@@ -1,24 +1,21 @@
-# ---- Stage 1: build the vendored @hot-updater/bsdiff fork into a tarball ----
-# The fork's dist/ is not committed (see vendor/bsdiff/.gitignore); we build it
-# here with tsdown and pack a tarball. The wasm is committed (assets/hdiff.wasm),
-# so build-wasm.mjs falls back to it — no Rust toolchain needed in the image.
+# Build dist/ without carrying the fork's build dependencies into the runtime
+# image. The API installs the resulting local file: package in the next stage.
 FROM oven/bun:1-alpine AS bsdiff
 WORKDIR /pkg
 COPY vendor/bsdiff/ ./
-RUN bun install \
- && bun run build \
- && bun pm pack --filename bsdiff.tgz
+RUN bun install --frozen-lockfile && bun run build
 
-# ---- Stage 2: runtime ----
 FROM oven/bun:1-alpine
 RUN apk update && apk add --no-cache tzdata
 RUN mkdir -p /home/bun/server/vendor/bsdiff && chown -R bun:bun /home/bun/server
 WORKDIR /home/bun/server
 USER bun
 
-# Bring in the prebuilt fork tarball first so the file: dependency in
-# package.json resolves during `bun install`.
-COPY --from=bsdiff --chown=bun:bun /pkg/bsdiff.tgz ./vendor/bsdiff/bsdiff.tgz
+# The local dependency must contain its compiled entry points before Bun
+# installs the API. dist/ is excluded from the build context and comes only
+# from the builder stage.
+COPY --from=bsdiff --chown=bun:bun /pkg/dist ./vendor/bsdiff/dist
+COPY --chown=bun:bun vendor/bsdiff/ ./vendor/bsdiff/
 
 COPY --chown=bun:bun package.json bun.lock* ./
 RUN bun install --frozen-lockfile

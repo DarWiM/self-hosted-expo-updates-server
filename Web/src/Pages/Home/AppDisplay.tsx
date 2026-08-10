@@ -73,7 +73,9 @@ const embeddedLine = (row: UpdateRow) => {
 }
 
 const UpdateIdCell = ({ row, onOpen }: { row: UpdateRow; onOpen: (row: UpdateRow) => void }) => {
-  const clickable = !!row.uploadAvailable
+  // An embedded from-base has an upload record but is not a servable update, so
+  // its row stays non-clickable — the Release dialog must never open for it.
+  const clickable = !!row.uploadAvailable && !row.upload?.embedded
   const embedded = embeddedLine(row)
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -95,7 +97,13 @@ const UpdateIdCell = ({ row, onOpen }: { row: UpdateRow; onOpen: (row: UpdateRow
           wordBreak: 'break-all',
           lineHeight: 1.3,
         }}
-        title={clickable ? 'Click to open update details' : 'No upload record — embedded in a native build'}>
+        title={
+          clickable
+            ? 'Click to open update details'
+            : row.upload?.embedded
+              ? 'Embedded from-base — a bsdiff base, not a servable update'
+              : 'No upload record — embedded in a native build'
+        }>
         {row.updateId}
       </span>
       {row.status && (

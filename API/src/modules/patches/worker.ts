@@ -80,6 +80,7 @@ const claimNextPendingPatch = async (
   const wasInProgress = prevStatus === 'generating' || prevStatus === 'validating'
   const lastTouched = before.lastAttemptAt ? new Date(before.lastAttemptAt as unknown as string) : null
   const ageMin = lastTouched ? Math.round((now.getTime() - lastTouched.getTime()) / 60000) : 0
+  const attempts = typeof before.attempts === 'number' ? before.attempts : 0
   const reason = wasInProgress
     ? `stale reclaim: previous worker run in '${prevStatus}' stalled (no heartbeat for ~${ageMin} min)`
     : undefined
@@ -97,7 +98,7 @@ const claimNextPendingPatch = async (
       event: 'status-changed',
       status: 'generating',
       previousStatus: prevStatus,
-      attempts: (before.attempts || 0) + 1,
+      attempts: attempts + 1,
       reason,
     })
     .catch((e) =>
@@ -112,7 +113,7 @@ const claimNextPendingPatch = async (
     ...before,
     status: 'generating',
     lastAttemptAt: now,
-    attempts: (before.attempts || 0) + 1,
+    attempts: attempts + 1,
   } as PatchWorkerRecord
 }
 

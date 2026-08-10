@@ -21,6 +21,7 @@ services:
       - NODE_ENV=production
       - PUBLIC_URL=https://api.myserverpublic # Public URL for the server, better if it is a https URL. http://localhost:3000 for testing
       - DASBHOARD_THROTTLE_MSEC=5000 # No more than one refresh every 5 seconds fror the dashboard
+      - RUN_MIGRATIONS_ON_BOOT=true # Apply pending DB migrations on container start
   self_hosted_expo_updates_server_web:
     image: ghcr.io/umbertoghio/self-hosted-expo-updates-server-web:latest
     container_name: self_hosted_expo_updates_server_web
