@@ -48,6 +48,10 @@ export interface UploadRecord extends UnknownRecord {
   gitBranch?: string
   embeddedIos?: boolean
   embeddedAndroid?: boolean
+  // An embedded from-base upload (bsdiff base for the first OTA after install).
+  // Not a servable update — the UI must never offer Release for it.
+  embedded?: boolean
+  platform?: string
 }
 
 export interface PatchRecord extends UnknownRecord {
