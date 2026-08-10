@@ -136,3 +136,29 @@ test('releasing an update must not resurrect soft-deleted tombstones', async () 
   expect(byId('D').status).toBe('deleted')
   expect(byId('D').releasedAt).toBe('2021-06-01T00:00:00.000Z')
 })
+
+test('releasing an embedded from-base record is refused', async () => {
+  // E has valid files, so without the embedded guard the integrity gate would
+  // pass and setRelease would happily flip it to 'released' — which would then
+  // be served to devices as a (assetless) OTA manifest. The guard blocks it.
+  const store = [
+    {
+      _id: 'E',
+      project: 'p',
+      version: '1',
+      releaseChannel: 'prod',
+      status: 'ready',
+      updateId: 'a10096be-14e3-47da-8d1c-9bebb61c9932',
+      embedded: true,
+      platform: 'android',
+      path: targetDir,
+      filename: targetZip,
+    },
+  ]
+
+  const svc = new Service()
+  svc.setup(makeApp(store) as any)
+
+  await expect(svc.setRelease({ uploadId: 'E' })).rejects.toThrow(/embedded/i)
+  expect(store[0].status).toBe('ready')
+})
