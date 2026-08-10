@@ -4,7 +4,7 @@ import moment from 'moment'
 import { Column } from 'primereact/column'
 import { DataTable } from 'primereact/datatable'
 
-import { Card, Colors, Spinner, Text } from '../../Components'
+import { Card, Colors, EmbeddedTag, Spinner, Text } from '../../Components'
 import { useCollapsedState, useCQuery } from '../../Services'
 import { Release } from './Release'
 
@@ -55,22 +55,25 @@ const VersionTable = ({ project, version, updates, defaultCollapsed, onOpen }) =
           field="updateId"
           header="Update ID"
           body={(row) => (
-            <span
-              onClick={(e) => {
-                e.stopPropagation()
-                onOpen(row)
-              }}
-              title="Open update details"
-              style={{
-                fontFamily: 'ui-monospace, Menlo, monospace',
-                fontSize: 12,
-                wordBreak: 'break-all',
-                cursor: 'pointer',
-                color: Colors.primary,
-                textDecoration: 'underline dotted',
-              }}>
-              {row.updateId || '—'}
-            </span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+              <span
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onOpen(row)
+                }}
+                title="Open update details"
+                style={{
+                  fontFamily: 'ui-monospace, Menlo, monospace',
+                  fontSize: 12,
+                  wordBreak: 'break-all',
+                  cursor: 'pointer',
+                  color: Colors.primary,
+                  textDecoration: 'underline dotted',
+                }}>
+                {row.updateId || '—'}
+              </span>
+              {row.embedded && <EmbeddedTag platform={row.platform} />}
+            </div>
           )}
         />
         <Column field="releaseChannel" header="Channel" style={{ width: 130 }} />

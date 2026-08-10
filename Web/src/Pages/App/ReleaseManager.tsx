@@ -11,6 +11,7 @@ import {
   Colors,
   ConfirmDialog,
   DateRangeFilter,
+  EmbeddedTag,
   Flex,
   InlineMultiToggle,
   Spinner,
@@ -302,23 +303,26 @@ const IntegrityCheckSection = ({
                 sortable
                 filter
                 body={(row) => (
-                  <span
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleOpen(row)
-                    }}
-                    title={opening === row._id ? 'Loading…' : 'Open update details'}
-                    style={{
-                      fontFamily: 'ui-monospace, Menlo, monospace',
-                      fontSize: 12,
-                      wordBreak: 'break-all',
-                      cursor: 'pointer',
-                      color: Colors.primary,
-                      textDecoration: 'underline dotted',
-                      opacity: opening === row._id ? 0.5 : 1,
-                    }}>
-                    {row.updateId || '—'}
-                  </span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                    <span
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleOpen(row)
+                      }}
+                      title={opening === row._id ? 'Loading…' : 'Open update details'}
+                      style={{
+                        fontFamily: 'ui-monospace, Menlo, monospace',
+                        fontSize: 12,
+                        wordBreak: 'break-all',
+                        cursor: 'pointer',
+                        color: Colors.primary,
+                        textDecoration: 'underline dotted',
+                        opacity: opening === row._id ? 0.5 : 1,
+                      }}>
+                      {row.updateId || '—'}
+                    </span>
+                    {row.embedded && <EmbeddedTag platform={row.platform} />}
+                  </div>
                 )}
               />
               <Column
@@ -549,23 +553,26 @@ const OldUpdatesCleanupSection = ({
                 sortable
                 filter
                 body={(row) => (
-                  <span
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleOpenCandidate(row)
-                    }}
-                    title={opening === row._id ? 'Loading…' : 'Open update details'}
-                    style={{
-                      fontFamily: 'ui-monospace, Menlo, monospace',
-                      fontSize: 12,
-                      wordBreak: 'break-all',
-                      cursor: 'pointer',
-                      color: Colors.primary,
-                      textDecoration: 'underline dotted',
-                      opacity: opening === row._id ? 0.5 : 1,
-                    }}>
-                    {row.updateId || '—'}
-                  </span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                    <span
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleOpenCandidate(row)
+                      }}
+                      title={opening === row._id ? 'Loading…' : 'Open update details'}
+                      style={{
+                        fontFamily: 'ui-monospace, Menlo, monospace',
+                        fontSize: 12,
+                        wordBreak: 'break-all',
+                        cursor: 'pointer',
+                        color: Colors.primary,
+                        textDecoration: 'underline dotted',
+                        opacity: opening === row._id ? 0.5 : 1,
+                      }}>
+                      {row.updateId || '—'}
+                    </span>
+                    {row.embedded && <EmbeddedTag platform={row.platform} />}
+                  </div>
                 )}
               />
               <Column
@@ -1058,22 +1065,25 @@ export const ReleaseManager = ({ app }: { app: AppRecord }) => {
               filter
               sortable
               body={(row) => (
-                <span
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setUpdate(row)
-                  }}
-                  title="Open update details"
-                  style={{
-                    fontFamily: 'ui-monospace, Menlo, monospace',
-                    fontSize: 12,
-                    wordBreak: 'break-all',
-                    cursor: 'pointer',
-                    color: Colors.primary,
-                    textDecoration: 'underline dotted',
-                  }}>
-                  {row.updateId || '—'}
-                </span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setUpdate(row)
+                    }}
+                    title="Open update details"
+                    style={{
+                      fontFamily: 'ui-monospace, Menlo, monospace',
+                      fontSize: 12,
+                      wordBreak: 'break-all',
+                      cursor: 'pointer',
+                      color: Colors.primary,
+                      textDecoration: 'underline dotted',
+                    }}>
+                    {row.updateId || '—'}
+                  </span>
+                  {row.embedded && <EmbeddedTag platform={row.platform} />}
+                </div>
               )}
             />
             <Column
