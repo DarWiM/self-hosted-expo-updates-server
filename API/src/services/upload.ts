@@ -9,7 +9,7 @@ import multer from 'multer'
 import * as unzipper from 'unzipper'
 
 import { getJSONInfo } from '../modules/expo/asset'
-import { getUpdateHash, getUpdateId } from '../modules/expo/helpers'
+import { getUpdateHash, getUpdateId, parseEmbeddedMetadata, replaceExistingEmbedded } from '../modules/expo/helpers'
 import type { AppLike, HookContextLike, UnknownRecord, UploadRecord } from '../types'
 
 const blobStorage = fsBlob('/uploads')
@@ -76,21 +76,53 @@ const createDocument = async (context: UploadHookContext) => {
   let dependencies = null
   let updateId = null
   let updateHash = null
+  let embedded = false
+  let platform: string | null = null
   try {
-    const info = getJSONInfo({ path })
-    appJson = info.appJson
-    dependencies = info.dependencies
     updateHash = getUpdateHash(path)
-    updateId = getUpdateId(path, updateHash)
+    const metadataJson = JSON.parse(fs.readFileSync(`${path}/metadata.json`, 'utf-8'))
+    const emb = parseEmbeddedMetadata(metadataJson)
+    if (emb.embedded) {
+      // Embedded from-base: the id is explicit (app.manifest.id, random per
+      // native build — the server can't derive it) and the artifact is
+      // single-platform. app.json/package.json aren't required (not on the
+      // patch path), so skip getJSONInfo. See embedded-ingest contract v1.
+      embedded = true
+      updateId = emb.updateId
+      platform = emb.platform
+    } else {
+      const info = getJSONInfo({ path })
+      appJson = info.appJson
+      dependencies = info.dependencies
+      updateId = getUpdateId(path, updateHash)
+    }
   } catch (e) {
     fs.rmSync(path, { recursive: true, force: true })
     fs.rmSync(upload.filename, { force: true })
-    fs.rmSync(path, { recursive: true, force: true })
     context.app.service('uploads').remove(upload._id)
+    // Preserve the specific embedded-validation message (bad updateId, wrong
+    // platform count, …); fall back to the generic hint otherwise.
+    if (e instanceof Err.BadRequest) throw e
     throw new Err.BadRequest('No metadata.json found, was it included in the zip?')
   }
 
-  await context.app.service('uploads')._patch(upload._id, { path, appJson, dependencies, updateId, updateHash })
+  if (embedded) {
+    // Idempotent per (project, version, releaseChannel, platform, updateId):
+    // drop any prior embedded record on this key before finalizing ours, so the
+    // partial-unique index holds and rebuilds don't accumulate duplicates.
+    await replaceExistingEmbedded(
+      context.app.service('uploads'),
+      { project: upload.project, version: upload.version, releaseChannel: upload.releaseChannel, platform, updateId },
+      upload._id,
+    )
+  }
+
+  const patchData: UnknownRecord = { path, appJson, dependencies, updateId, updateHash }
+  if (embedded) {
+    patchData.embedded = true
+    patchData.platform = platform
+  }
+  await context.app.service('uploads')._patch(upload._id, patchData)
 
   delete context.result.id
   delete context.result.contentType
