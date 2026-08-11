@@ -3,8 +3,8 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 
-import { replaceExistingEmbedded } from './helpers'
 import type { UnknownRecord, UploadRecord } from '../../types'
+import { replaceExistingEmbedded } from './helpers'
 
 // Minimal in-memory stand-in for the feathers `uploads` service — only the
 // find/remove surface replaceExistingEmbedded touches. The query matcher does

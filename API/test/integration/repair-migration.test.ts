@@ -1,8 +1,8 @@
 import { expect, test } from 'bun:test'
 import * as path from 'path'
 
-import { connectTestDb, hasTestMongo } from '../helpers/mongo'
 import { migrateUp } from '../../src/modules/migrations/runner'
+import { connectTestDb, hasTestMongo } from '../helpers/mongo'
 
 const MIGRATIONS_DIR = path.resolve(__dirname, '../../migrations')
 

@@ -3,8 +3,8 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 
-import { connectTestDb, hasTestMongo } from '../helpers/mongo'
 import { migrateDown, migrateUp, migrationStatus } from '../../src/modules/migrations/runner'
+import { connectTestDb, hasTestMongo } from '../helpers/mongo'
 
 let dir: string
 

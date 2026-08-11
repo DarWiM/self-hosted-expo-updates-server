@@ -1,6 +1,6 @@
 import config from 'config'
 import * as fs from 'fs'
-import { MongoClient, type Db } from 'mongodb'
+import { type Db, MongoClient } from 'mongodb'
 import * as path from 'path'
 
 import { migrateDown, migrateUp, migrationStatus } from '../src/modules/migrations/runner'

@@ -1,10 +1,11 @@
+// Barrel first to resolve the utils <-> services circular import (see release.test.ts).
+import '../../src/services'
+
 import { afterEach, beforeEach, expect, test } from 'bun:test'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 
-// Barrel first to resolve the utils <-> services circular import (see release.test.ts).
-import '../../src/services'
 import { Service } from '../../src/services/utils'
 
 let tmp: string

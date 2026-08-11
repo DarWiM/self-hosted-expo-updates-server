@@ -1,8 +1,3 @@
-import { afterAll, beforeAll, expect, test } from 'bun:test'
-import * as fs from 'fs'
-import * as os from 'os'
-import * as path from 'path'
-
 // utils.ts → ../modules → feathers.config → ../services barrel → utils is a
 // circular import. It resolves fine when the app boots from src/index.ts, but
 // importing utils.ts *as the entry module* trips an ESM temporal-dead-zone
@@ -10,6 +5,12 @@ import * as path from 'path'
 // barrel's re-export line runs. The barrel has no eval-time side effects
 // (services/mongo are only wired inside functions), so this is safe.
 import '../../src/services'
+
+import { afterAll, beforeAll, expect, test } from 'bun:test'
+import * as fs from 'fs'
+import * as os from 'os'
+import * as path from 'path'
+
 import { Service } from '../../src/services/utils'
 
 // setRelease runs a pre-flight integrity check on the upload being released

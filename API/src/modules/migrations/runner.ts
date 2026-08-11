@@ -1,5 +1,5 @@
-import type { Db } from 'mongodb'
 import * as fs from 'fs'
+import type { Db } from 'mongodb'
 import * as path from 'path'
 
 import { isDuplicateKeyError } from '../mongo-errors'
@@ -42,7 +42,10 @@ async function listMigrationFiles(dir: string): Promise<string[]> {
 }
 
 async function appliedNames(db: Db): Promise<string[]> {
-  const docs = await db.collection(MIGRATIONS_COLLECTION).find({}, { projection: { _id: 1 } }).toArray()
+  const docs = await db
+    .collection(MIGRATIONS_COLLECTION)
+    .find({}, { projection: { _id: 1 } })
+    .toArray()
   return docs.map((d) => String(d._id))
 }
 

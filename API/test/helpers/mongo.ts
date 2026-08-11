@@ -1,4 +1,4 @@
-import { MongoClient, type Db } from 'mongodb'
+import { type Db, MongoClient } from 'mongodb'
 
 const TEST_MONGO_CONN = process.env.TEST_MONGO_CONN
 

@@ -1,8 +1,9 @@
-import { expect, test } from 'bun:test'
-
 // Same circular-import workaround as release.test.ts: evaluate the services
 // barrel before importing utils as an entry module.
 import '../../src/services'
+
+import { expect, test } from 'bun:test'
+
 import { Service } from '../../src/services/utils'
 
 // In-memory stand-in for the feathers services deleteMany → deleteRelease
