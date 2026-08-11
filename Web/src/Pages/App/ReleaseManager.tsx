@@ -951,12 +951,60 @@ const OrphanFilesSection = ({ project }) => {
   )
 }
 
+// released is the live release (deleting it 404s devices) and deleted is
+// already a tombstone with its files gone — neither can be bulk-deleted. The
+// server's deleteMany guards both too; here we just gray out their checkbox.
+const isUploadDeletable = (row?: UploadRecord) => row?.status !== 'released' && row?.status !== 'deleted'
+
 export const ReleaseManager = ({ app }: { app: AppRecord }) => {
   const { data: uploadsResult, isSuccess } = useCQuery<ListResult<UploadRecord>>(['uploads', app._id])
   const uploads = listFromResult(uploadsResult)
   const [update, setUpdate] = useState<UploadRecord | null>(null)
   const [releasing, setRelasing] = useState(false)
   const [activeTab, setActiveTab] = useState(0)
+  // Bulk-delete is off by default — the checkbox column only appears once the
+  // user opts into it via the button under the table, so day-to-day browsing
+  // isn't cluttered with selection controls.
+  const [bulkMode, setBulkMode] = useState(false)
+  const [selectedUploads, setSelectedUploads] = useState<UploadRecord[]>([])
+  const [bulkConfirm, setBulkConfirm] = useState(false)
+  const [bulkRunning, setBulkRunning] = useState(false)
+
+  const exitBulkMode = () => {
+    setBulkMode(false)
+    setSelectedUploads([])
+  }
+
+  const runBulkDeleteUploads = async () => {
+    if (!selectedUploads.length) return
+    setBulkRunning(true)
+    try {
+      const res = (await FC.client
+        .service('utils')
+        .update('deleteMany', { uploadIds: selectedUploads.map((u) => u._id) })) as {
+        deleted: number
+        skipped?: { uploadId: string; reason: string }[]
+        errors?: { uploadId: string; error?: string }[]
+      }
+      const skippedCount = res.skipped?.length || 0
+      const errorCount = res.errors?.length || 0
+      const parts = [`${res.deleted} deleted`]
+      if (skippedCount) parts.push(`${skippedCount} skipped`)
+      if (errorCount) parts.push(`${errorCount} failed`)
+      window.toast?.show({
+        severity: errorCount ? 'error' : skippedCount ? 'warn' : 'info',
+        summary: errorCount ? 'Completed with errors' : 'Deleted',
+        detail: parts.join(', ') + '.',
+      })
+    } catch (e) {
+      window.toast?.show({ severity: 'error', summary: 'Bulk delete failed', detail: (e as Error).message })
+    }
+    setBulkConfirm(false)
+    setBulkRunning(false)
+    setSelectedUploads([])
+    setBulkMode(false)
+    invalidateQuery(['uploads', 'published'])
+  }
 
   const [uploadFilters, setUploadFilters] = useState<DataTableFilterMeta>({
     updateId: { value: null, matchMode: FilterMatchMode.CONTAINS },
@@ -1056,12 +1104,18 @@ export const ReleaseManager = ({ app }: { app: AppRecord }) => {
             value={visibleUploads}
             paginator
             rows={25}
+            dataKey="_id"
+            selectionMode={bulkMode ? 'checkbox' : undefined}
+            selection={selectedUploads}
+            onSelectionChange={(e) => setSelectedUploads(e.value as UploadRecord[])}
+            isDataSelectable={(e) => isUploadDeletable(e.data as UploadRecord)}
             filterDisplay="menu"
             filters={uploadFilters}
             onFilter={(e) => setUploadFilters(e.filters)}
             paginatorTemplate="FirstPageLink PrevPageLink CurrentPageReport NextPageLink LastPageLink"
             currentPageReportTemplate="{first}–{last} of {totalRecords}"
             emptyMessage={hasActiveFilter ? 'No updates match the current filters' : 'No app versions yet'}>
+            {bulkMode && <Column selectionMode="multiple" headerStyle={{ width: '3rem' }} />}
             <Column
               field="updateId"
               header="Update ID"
@@ -1153,6 +1207,33 @@ export const ReleaseManager = ({ app }: { app: AppRecord }) => {
               body={({ status }) => <StatusPill status={status} />}
             />
           </DataTable>
+          <Flex row style={{ justifyContent: 'flex-start', alignItems: 'center', gap: 10, marginTop: 10 }}>
+            {bulkMode ? (
+              <>
+                <Button
+                  icon="trash"
+                  label={`Delete selected (${selectedUploads.length})`}
+                  danger
+                  disabled={!selectedUploads.length}
+                  onClick={() => setBulkConfirm(true)}
+                  style={{ padding: '2px 10px', fontSize: 11 }}
+                />
+                <Button
+                  icon="ban"
+                  label="Cancel"
+                  onClick={exitBulkMode}
+                  style={{ padding: '2px 10px', fontSize: 11 }}
+                />
+              </>
+            ) : (
+              <Button
+                icon="trash"
+                label="Select updates to delete"
+                onClick={() => setBulkMode(true)}
+                style={{ padding: '2px 10px', fontSize: 11 }}
+              />
+            )}
+          </Flex>
           {deletedCount > 0 && (
             <Flex row style={{ justifyContent: 'flex-end', marginTop: 6 }}>
               <label
@@ -1208,6 +1289,21 @@ export const ReleaseManager = ({ app }: { app: AppRecord }) => {
           <OrphanFilesSection project={app._id} />
         </TabPanel>
       </TabView>
+
+      <ConfirmDialog
+        visible={bulkConfirm}
+        title="Delete Selected Updates"
+        confirmIcon="trash"
+        confirmLabel={`Delete ${selectedUploads.length}`}
+        confirmDanger
+        onConfirm={runBulkDeleteUploads}
+        onCancel={() => (bulkRunning ? null : setBulkConfirm(false))}
+        loading={bulkRunning}>
+        <Text
+          value={`You are about to delete ${selectedUploads.length} update${selectedUploads.length === 1 ? '' : 's'}. All related files will be permanently removed from the server.`}
+        />
+        <Text value="This cannot be undone. Are you sure?" style={{ marginTop: 20 }} />
+      </ConfirmDialog>
 
       <Release update={update} releaseState={[releasing, setRelasing]} onHide={() => setUpdate(null)} />
     </Card>
