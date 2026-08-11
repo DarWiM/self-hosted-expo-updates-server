@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 
-import { pickFromUpload } from './asset'
 import type { UploadRecord } from '../../types'
+import { pickFromUpload } from './asset'
 
 const up = (over: Partial<UploadRecord>): UploadRecord =>
   ({ _id: 'x', updateId: 'u', version: '1.0', releaseChannel: 'production', ...over }) as UploadRecord

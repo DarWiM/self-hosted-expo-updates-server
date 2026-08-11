@@ -1,7 +1,8 @@
-import { expect, test } from 'bun:test'
-
 // Barrel first to resolve the services circular import (see release.test.ts).
 import '../../src/services'
+
+import { expect, test } from 'bun:test'
+
 import patches from '../../src/services/patches'
 
 // Minimal uploads.get/find stand-in. The embedded-target guards fire right

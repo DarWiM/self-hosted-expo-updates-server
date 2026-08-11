@@ -8,6 +8,7 @@ import loggerDefault from '../logger'
 import { isDuplicateKeyError } from '../mongo-errors'
 import { isLaunchBundleHealthy } from './integrity'
 import { getLaunchAssetPathAsync } from './patch'
+
 const logger: LoggerLike = loggerDefault
 
 const PATCH_TERMINAL_NOT_BENEFICIAL = 'not-beneficial'
@@ -100,7 +101,7 @@ const isLaunchAssetPath = async (assetPath, upload, platform) => {
 }
 
 const tryHandlePatch = async (app, { query, headers }, fallback) => {
-  const { asset, project, platform, updateId, contentType } = query
+  const { asset, project, platform, updateId } = query
   if (!wantsBsdiffPatch(headers)) return fallback
   if (!project || !platform || !updateId) return fallback
   if (platform !== 'ios' && platform !== 'android') return fallback

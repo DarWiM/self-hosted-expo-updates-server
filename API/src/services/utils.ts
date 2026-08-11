@@ -187,6 +187,67 @@ class Service {
     return { message: 'Update Deleted', ops: fileOps }
   }
 
+  // Soft-delete a batch of uploads in one call. Reuses the single-upload
+  // deleteRelease per id (same pattern as cleanupOldUpdates), but guards the
+  // two states that must never be deleted this way:
+  //   - 'released' is the live release — deleting it would 404 devices. The UI
+  //     already disables its checkbox; this is the server-side backstop.
+  //   - 'deleted' is a tombstone whose files are already gone — re-deleting is
+  //     a no-op that would only log missing-file noise.
+  // Skipped/not-found ids are reported (not thrown) so a mixed selection still
+  // deletes what it can; per-id failures land in `errors`.
+  async deleteMany({ uploadIds }: { uploadIds?: string[] } = {}) {
+    if (!Array.isArray(uploadIds) || !uploadIds.length) throw new Err.BadRequest('Missing uploadIds')
+
+    let deleted = 0
+    let zipsRemoved = 0
+    let dirsRemoved = 0
+    let zipsMissing = 0
+    let dirsMissing = 0
+    const skipped = []
+    const errors = []
+
+    for (const uploadId of uploadIds) {
+      let upload: UploadRecord | null = null
+      try {
+        upload = (await this.app.service('uploads').get(uploadId)) as UploadRecord
+      } catch (e) {
+        upload = null
+      }
+      if (!upload) {
+        skipped.push({ uploadId, reason: 'not-found' })
+        continue
+      }
+      if (upload.status === 'released') {
+        skipped.push({ uploadId, reason: 'released' })
+        continue
+      }
+      if (upload.status === 'deleted') {
+        skipped.push({ uploadId, reason: 'already-deleted' })
+        continue
+      }
+      try {
+        const res = await this.deleteRelease({ uploadId })
+        deleted++
+        for (const op of res.ops || []) {
+          if (op.error) errors.push({ uploadId, path: op.path, error: op.error })
+          if (op.type === 'zip-archive') {
+            if (op.removed) zipsRemoved++
+            else if (!op.existed) zipsMissing++
+          }
+          if (op.type === 'extracted-dir') {
+            if (op.removed) dirsRemoved++
+            else if (!op.existed) dirsMissing++
+          }
+        }
+      } catch (e) {
+        errors.push({ uploadId, error: e instanceof Error ? e.message : String(e) })
+      }
+    }
+
+    return { deleted, skipped, errors, zipsRemoved, dirsRemoved, zipsMissing, dirsMissing }
+  }
+
   // Hard-delete a previously soft-deleted upload. The patches cascade and
   // disk cleanup already happened at soft-delete time, so this just removes
   // the tombstone row. Refuse to purge non-deleted uploads — soft-delete is
@@ -205,6 +266,7 @@ class Service {
   async update(id, data) {
     if (id === 'release') return this.setRelease(data)
     if (id === 'delete') return this.deleteRelease(data)
+    if (id === 'deleteMany') return this.deleteMany(data || {})
     if (id === 'purgeDeleted') return this.purgeDeleted(data || {})
     if (id === 'cleanupOldUpdates') return this.cleanupOldUpdates(data || {})
     if (id === 'checkIntegrity') return this.checkIntegrity(data || {})
