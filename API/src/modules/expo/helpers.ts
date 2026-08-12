@@ -209,6 +209,16 @@ export const parseEmbeddedMetadata = (metadataJson: unknown): EmbeddedMetadata =
   return { embedded: true, updateId, platform }
 }
 
+// The /api/updates listing filters by platform without reading each upload's
+// metadata.json off disk on every request. We persist the available platforms
+// at ingest time (upload.ts) and backfill existing rows via migration; both
+// derive them from the ios/android keys actually present in fileMetadata.
+export const extractPlatforms = (metadataJson: unknown): string[] => {
+  const meta = (metadataJson ?? {}) as Record<string, unknown>
+  const fileMetadata = (meta.fileMetadata ?? {}) as Record<string, unknown>
+  return Object.keys(fileMetadata).filter((p) => EMBEDDED_PLATFORMS.includes(p))
+}
+
 interface UploadsFindRemove {
   find(params: { query: UnknownRecord }): Promise<unknown>
   remove(id: unknown): Promise<unknown>

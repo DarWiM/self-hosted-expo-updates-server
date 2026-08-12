@@ -1,4 +1,5 @@
 import * as Err from '@feathersjs/errors'
+import * as crypto from 'crypto'
 import * as fs from 'fs'
 import * as path from 'path'
 
@@ -655,6 +656,7 @@ class Service {
 
   async get(id, params) {
     if (id === 'generateSelfSigned') return generateSelfSigned()
+    if (id === 'generateListKey') return { listKey: crypto.randomBytes(32).toString('hex') }
     if (id === 'getUploadKey') return { uploadKey: this.app.get('uploadKey') }
     if (id === 'updateSizes') return this.getUpdateSizes(params || {})
     if (id === 'oldUpdatesCleanupCandidates') {

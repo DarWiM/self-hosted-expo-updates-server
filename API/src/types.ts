@@ -91,6 +91,20 @@ export interface UploadRecord extends UnknownRecord {
   gitBranch?: string
   appJson?: unknown
   dependencies?: unknown
+  embedded?: boolean
+  platform?: string
+  // ios/android keys present in the upload's fileMetadata, persisted at ingest
+  // so the listing endpoint can filter by platform without reading disk.
+  platforms?: string[]
+}
+
+export interface AppRecord extends UnknownRecord {
+  _id: string
+  bsdiffEnabled?: boolean
+  privateKey?: string
+  // Per-app read token gating the app-facing GET /api/updates listing. Set via
+  // the Web admin (ConfigServer) or a direct apps.patch; unset = listing locked.
+  listKey?: string
 }
 
 export interface MetadataJson {
