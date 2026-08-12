@@ -62,6 +62,18 @@ const fmtBytes = (n?: number) => {
   return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`
 }
 
+// The publish script sends `git-commit: $(git log --oneline -n 1)`, so the
+// stored gitCommit is "<hash> <subject>". Split on the first whitespace to
+// separate the short hash (shown mono in the cell) from the commit subject
+// (shown on hover). 'Unknown' is the fallback the API writes when the header
+// is absent — treat it as no commit.
+const parseCommit = (raw?: string): { hash: string; desc: string } | null => {
+  const s = (raw || '').trim()
+  if (!s || s === 'Unknown') return null
+  const idx = s.search(/\s/)
+  return idx === -1 ? { hash: s, desc: '' } : { hash: s.slice(0, idx), desc: s.slice(idx + 1).trim() }
+}
+
 // Status filter chips show the live lifecycle states only — 'deleted' is
 // handled by a separate "Show deleted" toolbar toggle so the chip's funnel
 // icon doesn't show as "active" on first paint, and PrimeReact's built-in
@@ -1008,6 +1020,7 @@ export const ReleaseManager = ({ app }: { app: AppRecord }) => {
 
   const [uploadFilters, setUploadFilters] = useState<DataTableFilterMeta>({
     updateId: { value: null, matchMode: FilterMatchMode.CONTAINS },
+    gitCommit: { value: null, matchMode: FilterMatchMode.CONTAINS },
     releaseChannel: { value: null, matchMode: FilterMatchMode.IN },
     version: { value: null, matchMode: FilterMatchMode.IN },
     status: { value: null, matchMode: FilterMatchMode.IN },
@@ -1102,6 +1115,8 @@ export const ReleaseManager = ({ app }: { app: AppRecord }) => {
           <DataTable
             style={{ marginTop: 10, width: '100%' }}
             value={visibleUploads}
+            sortField="createdAt"
+            sortOrder={-1}
             paginator
             rows={25}
             dataKey="_id"
@@ -1120,7 +1135,6 @@ export const ReleaseManager = ({ app }: { app: AppRecord }) => {
               field="updateId"
               header="Update ID"
               filter
-              sortable
               body={(row) => (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
                   <span
@@ -1158,17 +1172,21 @@ export const ReleaseManager = ({ app }: { app: AppRecord }) => {
                 />
               )}
               body={({ createdAt }) => (
-                <span style={{ fontSize: 12, fontVariantNumeric: 'tabular-nums' }}>
-                  {moment(createdAt).format('YYYY-MM-DD HH:mm:ss')}
-                </span>
+                <div style={{ display: 'flex', flexDirection: 'column', fontSize: 12, fontVariantNumeric: 'tabular-nums' }}>
+                  <span>{moment(createdAt).format('YYYY-MM-DD')}</span>
+                  <span style={{ color: 'rgba(255,255,255,0.6)' }}>{moment(createdAt).format('HH:mm:ss')}</span>
+                </div>
               )}
             />
             <Column
               field="releaseChannel"
               header="Channel"
               filter
-              sortable
               showFilterMatchModes={false}
+              style={{ width: 110 }}
+              body={({ releaseChannel }) => (
+                <span style={{ fontSize: 13 }}>{releaseChannel || '—'}</span>
+              )}
               filterElement={(o) => (
                 <InlineMultiToggle
                   value={o.value as string[] | undefined}
@@ -1192,10 +1210,31 @@ export const ReleaseManager = ({ app }: { app: AppRecord }) => {
               )}
             />
             <Column
+              field="gitCommit"
+              header="Commit"
+              filter
+              filterPlaceholder="Search hash or message"
+              body={(row) => {
+                const c = parseCommit(row.gitCommit)
+                if (!c) return <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>—</span>
+                return (
+                  <span
+                    title={c.desc ? `${c.hash} ${c.desc}` : c.hash}
+                    style={{
+                      fontFamily: 'ui-monospace, Menlo, monospace',
+                      fontSize: 12,
+                      wordBreak: 'break-all',
+                      cursor: c.desc ? 'help' : 'default',
+                    }}>
+                    {c.hash}
+                  </span>
+                )
+              }}
+            />
+            <Column
               field="status"
               header="Status"
               filter
-              sortable
               showFilterMatchModes={false}
               filterElement={(o) => (
                 <InlineMultiToggle

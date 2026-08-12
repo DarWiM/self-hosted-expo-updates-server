@@ -94,14 +94,17 @@ class Service {
       },
     })) as UploadRecord[]
 
+    const now = new Date().toISOString()
     await Promise.all(
-      uploads.map((upd) =>
-        this.app.service('uploads').patch(upd._id, {
-          status:
-            upd._id.toString() === upload._id.toString() ? 'released' : upd.status === 'ready' ? 'ready' : 'obsolete',
-          releasedAt: upd._id.toString() === upload._id.toString() ? new Date().toISOString() : null,
-        }),
-      ),
+      uploads
+        .map((upd) => {
+          const isTarget = upd._id.toString() === upload._id.toString()
+          const nextStatus = isTarget ? 'released' : upd.status === 'ready' ? 'ready' : 'obsolete'
+          const nextReleasedAt = isTarget ? now : null
+          if (upd.status === nextStatus && (upd.releasedAt ?? null) === nextReleasedAt) return null
+          return this.app.service('uploads').patch(upd._id, { status: nextStatus, releasedAt: nextReleasedAt })
+        })
+        .filter(Boolean),
     )
     return { message: 'Update Set' }
   }
