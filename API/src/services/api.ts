@@ -4,6 +4,7 @@ import s from '../hooks/security'
 import { handleAssetData, handleAssetResponse } from '../modules/expo/asset'
 import { handleManifestResponse, hanldeManifestData } from '../modules/expo/manifest'
 import { getRequestParams } from '../modules/expo/request'
+import { handleUpdatesList } from '../modules/expo/updates-list'
 import type { AppLike, ClientRecord, UnknownRecord } from '../types'
 
 class Service {
@@ -93,6 +94,7 @@ class Service {
     }
 
     if (id === 'assets') return handleAssetData(this.app, { query, headers })
+    if (id === 'updates') return handleUpdatesList(this.app, { query, headers })
     throw new Err.BadRequest('Invalid request.')
   }
 }

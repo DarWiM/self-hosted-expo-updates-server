@@ -9,7 +9,13 @@ import multer from 'multer'
 import * as unzipper from 'unzipper'
 
 import { getJSONInfo } from '../modules/expo/asset'
-import { getUpdateHash, getUpdateId, parseEmbeddedMetadata, replaceExistingEmbedded } from '../modules/expo/helpers'
+import {
+  extractPlatforms,
+  getUpdateHash,
+  getUpdateId,
+  parseEmbeddedMetadata,
+  replaceExistingEmbedded,
+} from '../modules/expo/helpers'
 import type { AppLike, HookContextLike, UnknownRecord, UploadRecord } from '../types'
 
 const blobStorage = fsBlob('/uploads')
@@ -78,6 +84,7 @@ const createDocument = async (context: UploadHookContext) => {
   let updateHash = null
   let embedded = false
   let platform: string | null = null
+  let platforms: string[] = []
   try {
     updateHash = getUpdateHash(path)
     const metadataJson = JSON.parse(fs.readFileSync(`${path}/metadata.json`, 'utf-8'))
@@ -90,11 +97,13 @@ const createDocument = async (context: UploadHookContext) => {
       embedded = true
       updateId = emb.updateId
       platform = emb.platform
+      platforms = emb.platform ? [emb.platform] : []
     } else {
       const info = getJSONInfo({ path })
       appJson = info.appJson
       dependencies = info.dependencies
       updateId = getUpdateId(path, updateHash)
+      platforms = extractPlatforms(metadataJson)
     }
   } catch (e) {
     fs.rmSync(path, { recursive: true, force: true })
@@ -117,7 +126,7 @@ const createDocument = async (context: UploadHookContext) => {
     )
   }
 
-  const patchData: UnknownRecord = { path, appJson, dependencies, updateId, updateHash }
+  const patchData: UnknownRecord = { path, appJson, dependencies, updateId, updateHash, platforms }
   if (embedded) {
     patchData.embedded = true
     patchData.platform = platform

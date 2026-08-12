@@ -20,9 +20,20 @@ export const ConfigServer = ({ state: [update, setUpdate] }: { state: StateTuple
   const [loading, setLoading] = useState(false)
   const [needsSave, setNeedsSave] = useState(false)
 
-  const updateField = (field: 'certificate' | 'privateKey') => (value: string) => {
+  const updateField = (field: 'certificate' | 'privateKey' | 'listKey') => (value: string) => {
     setUpdate({ ...update, [field]: value })
     setNeedsSave(true)
+  }
+
+  const handleGenerateListKey = async () => {
+    try {
+      const { listKey } = (await FC.client.service('utils').get('generateListKey')) as { listKey: string }
+      setUpdate({ ...update, listKey })
+      setNeedsSave(true)
+      window.toast?.show({ severity: 'info', summary: 'List token generated — remember to Save' })
+    } catch (e) {
+      window.toast?.show({ severity: 'error', summary: 'Error', detail: e.message })
+    }
   }
 
   const handleSelfSignedGenerate = async () => {
@@ -115,6 +126,13 @@ export const ConfigServer = ({ state: [update, setUpdate] }: { state: StateTuple
           onClick={() => downloadPem(update.privateKey, 'privatekey.pem')}
           style={{ marginTop: 10 }}
         />
+
+        <Text
+          value="Updates List Token (sent by the QA app as the x-updates-key header to list updates; leave empty to keep the listing locked):"
+          style={{ marginTop: 40 }}
+        />
+        <Input useState={[update.listKey || '', updateField('listKey')]} style={{ marginTop: 10, width: 800 }} />
+        <Button label="Generate token" onClick={handleGenerateListKey} style={{ marginTop: 10 }} />
 
         {loading ? <Spinner /> : <Button label="Save" onClick={handleSave} style={{ marginTop: 40 }} />}
       </Flex>

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { parseEmbeddedMetadata } from './helpers'
+import { extractPlatforms, parseEmbeddedMetadata } from './helpers'
 
 describe('parseEmbeddedMetadata', () => {
   const VALID_ID = 'a10096be-14e3-47da-8d1c-9bebb61c9932'
@@ -49,5 +49,26 @@ describe('parseEmbeddedMetadata', () => {
 
   test('embedded with missing fileMetadata throws', () => {
     expect(() => parseEmbeddedMetadata({ embedded: true, updateId: VALID_ID })).toThrow(/platform/i)
+  })
+})
+
+describe('extractPlatforms', () => {
+  test('returns both ios and android when present', () => {
+    expect(extractPlatforms({ fileMetadata: { ios: {}, android: {} } }).sort()).toEqual(['android', 'ios'])
+  })
+
+  test('returns a single platform when only one is present', () => {
+    expect(extractPlatforms({ fileMetadata: { android: {} } })).toEqual(['android'])
+  })
+
+  test('ignores unknown platform keys', () => {
+    expect(extractPlatforms({ fileMetadata: { ios: {}, windows: {} } })).toEqual(['ios'])
+  })
+
+  test('missing/empty fileMetadata → empty array', () => {
+    expect(extractPlatforms({})).toEqual([])
+    expect(extractPlatforms({ fileMetadata: {} })).toEqual([])
+    expect(extractPlatforms(null)).toEqual([])
+    expect(extractPlatforms(undefined)).toEqual([])
   })
 })

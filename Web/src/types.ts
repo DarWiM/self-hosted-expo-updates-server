@@ -27,6 +27,9 @@ export interface AppRecord extends UnknownRecord {
   _id: string
   name?: string
   bsdiffEnabled?: boolean
+  // Per-app read token for the app-facing GET /api/updates listing (sent by the
+  // QA app in the x-updates-key header). Unset = listing locked.
+  listKey?: string
 }
 
 export interface UploadRecord extends UnknownRecord {
